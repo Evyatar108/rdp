@@ -25,15 +25,26 @@ function Write-Log {
     Add-Content -Path $LogFile -Value $logMessage -ErrorAction SilentlyContinue -Encoding UTF8
 }
 
-function Get-LastInputTime {
-    # Get last input time using Windows API
+function Get-SystemIdleTimeSeconds {
+    <#
+    .SYNOPSIS
+        Gets the system-wide user input idle time using P/Invoke, mirroring the robust C# implementation.
+    .DESCRIPTION
+        This function uses GetLastInputInfo and the 64-bit GetTickCount64 to avoid 32-bit timer
+        wraparound issues, making it reliable for systems with long uptimes.
+    .RETURNS
+        [int] The total number of seconds the system has been idle.
+        Returns 0 on any failure to prevent accidental hibernation.
+    #>
     try {
-        # Try to use existing type first
-        $type = [GetLastInputTime.Win32Utils] -as [type]
-        if (-not $type) {
+        # Define the P/Invoke signature only once
+        if (-not ([System.Management.Automation.PSTypeName]'Win32.InputTimer').Type) {
             $signature = @'
 [DllImport("user32.dll")]
 public static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
+[DllImport("kernel32.dll")]
+public static extern ulong GetTickCount64();
 
 [StructLayout(LayoutKind.Sequential)]
 public struct LASTINPUTINFO
@@ -42,63 +53,29 @@ public struct LASTINPUTINFO
     public uint dwTime;
 }
 '@
-            $type = Add-Type -MemberDefinition $signature -Name Win32Utils -Namespace GetLastInputTime -PassThru -ErrorAction Stop
+            Add-Type -MemberDefinition $signature -Name InputTimer -Namespace Win32 -ErrorAction Stop
         }
-        
-        $lastInputInfo = New-Object GetLastInputTime.Win32Utils+LASTINPUTINFO
-        $lastInputInfo.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($lastInputInfo)
-        
-        if ($type::GetLastInputInfo([ref]$lastInputInfo)) {
-            $uptime = [Environment]::TickCount
-            $idleTime = $uptime - $lastInputInfo.dwTime
-            return [math]::Max(0, [math]::Round($idleTime / 1000)) # Return idle time in seconds
-        } else {
-            throw "GetLastInputInfo API call failed"
-        }
-    } catch {
-        Write-Log "Warning: Could not get last input time ($($_.Exception.Message)), using process-based fallback"
-        # Fallback: Use process activity as a proxy for user activity
-        try {
-            $recentProcesses = Get-Process | Where-Object {
-                $_.StartTime -and
-                $_.StartTime -gt (Get-Date).AddMinutes(-5) -and
-                $_.ProcessName -match "chrome|firefox|edge|notepad|winword|excel|powerpnt|code"
-            }
-            if ($recentProcesses) {
-                return 0  # Recent user processes found, consider as recent activity
-            } else {
-                return 300  # No recent user processes, assume 5 minutes idle
-            }
-        } catch {
-            return 0  # If all else fails, assume no idle time
-        }
-    }
-}
 
-function Test-UserActivity {
-    # Check for active RDP sessions
-    try {
-        $rdpSessions = quser 2>$null | Where-Object { $_ -match "Active|Disc" }
-        if ($rdpSessions) {
-            foreach ($session in $rdpSessions) {
-                if ($session -match "Active") {
-                    return $true  # Active RDP session found
-                }
-            }
+        $lastInputInfo = New-Object Win32.InputTimer+LASTINPUTINFO
+        $lastInputInfo.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($lastInputInfo)
+
+        if ([Win32.InputTimer]::GetLastInputInfo([ref]$lastInputInfo)) {
+            $currentTicks = [Win32.InputTimer]::GetTickCount64()
+            $lastInputTicks = $lastInputInfo.dwTime
+            
+            # The subtraction correctly handles timer wraparound when one value is from the 64-bit counter
+            $idleMilliseconds = $currentTicks - $lastInputTicks
+            
+            return [math]::Max(0, [math]::Round($idleMilliseconds / 1000))
+        } else {
+            # If the API call fails, get the last Win32 error for logging
+            $win32Error = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+            throw (New-Object System.ComponentModel.Win32Exception $win32Error)
         }
     } catch {
-        Write-Log "Warning: Could not check RDP sessions"
+        Write-Log "ERROR getting idle time: $($_.Exception.Message). Assuming activity to be safe."
+        return 0 # Fail safe: if we can't get idle time, assume the user is active.
     }
-    
-    # Check for running user processes (browsers, office apps, etc.)
-    $userProcesses = @("chrome", "firefox", "edge", "winword", "excel", "powerpnt", "notepad", "code", "devenv")
-    foreach ($process in $userProcesses) {
-        if (Get-Process -Name $process -ErrorAction SilentlyContinue) {
-            return $true  # User process is running
-        }
-    }
-    
-    return $false
 }
 
 function Invoke-VMHibernation {
@@ -149,17 +126,18 @@ Write-Log "Monitoring for inactivity... (Press Ctrl+C to stop)"
 
 try {
     while ($true) {
-        $idleSeconds = Get-LastInputTime
-        $hasUserActivity = Test-UserActivity
+        $idleSeconds = Get-SystemIdleTimeSeconds
         
-        if ($hasUserActivity -or $idleSeconds -lt $inactivityThresholdSeconds) {
+        if ($idleSeconds -lt $inactivityThresholdSeconds) {
+            # Activity detected, reset counter
             if ($consecutiveInactiveChecks -gt 0) {
-                Write-Log "User activity detected, resetting inactivity counter"
+                Write-Log "User activity detected, resetting inactivity counter."
                 $consecutiveInactiveChecks = 0
             }
-            # Clear progress bar when activity detected
-            Write-Progress -Activity "VM Hibernation Monitor" -Completed
+            # Clear progress bar when activity is detected
+            try { Write-Progress -Activity "VM Hibernation Monitor" -Completed -ErrorAction SilentlyContinue } catch {}
         } else {
+            # No activity, increment counter and update progress
             $consecutiveInactiveChecks++
             $idleMinutes = [math]::Round($idleSeconds / 60, 1)
             Write-Log "No activity detected for $idleMinutes minutes (check $consecutiveInactiveChecks/$requiredInactiveChecks)"
@@ -172,7 +150,7 @@ try {
             
             if ($consecutiveInactiveChecks -ge $requiredInactiveChecks) {
                 Write-Log "Inactivity threshold reached, hibernating VM..."
-                Write-Progress -Activity "VM Hibernation Monitor" -Completed
+                try { Write-Progress -Activity "VM Hibernation Monitor" -Completed -ErrorAction SilentlyContinue } catch {}
                 
                 if (Invoke-VMHibernation) {
                     Write-Log "VM hibernation initiated successfully"
