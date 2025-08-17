@@ -192,8 +192,8 @@ if ($Uninstall) {
     # Check if running inside a VM
     $isVM = (Get-WmiObject -Class Win32_ComputerSystem).Model -match "Virtual|VMware|VirtualBox|Hyper-V"
     if (-not $isVM) {
-        Write-Status "Warning: This does not appear to be running inside a VM"
-        Write-Status "   Continuing anyway..."
+        Write-Status "Warning: This does not appear to be running inside a VM" "Yellow"
+        Write-Status "   Continuing anyway..." "Yellow"
     }
     
     Install-InternalMonitor
@@ -202,3 +202,8 @@ if ($Uninstall) {
 }
 
 Write-Status ""
+Write-Status "Usage Tips:" "Yellow"
+Write-Status "   - To check status: .\deploy-internal-monitor.ps1" "Gray"
+Write-Status "   - To uninstall: .\deploy-internal-monitor.ps1 -Uninstall" "Gray"
+Write-Status "   - To change timeout: .\deploy-internal-monitor.ps1 -InactivityTimeoutMinutes 15" "Gray"
+Write-Status "   - View logs: Get-Content $($env:TEMP)\hibernation-monitor.log)" "Gray"
