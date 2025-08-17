@@ -202,8 +202,3 @@ if ($Uninstall) {
 }
 
 Write-Status ""
-Write-Status "Usage Tips:" "Yellow"
-Write-Status "   - To check status: .\deploy-internal-monitor.ps1" "Gray"
-Write-Status "   - To uninstall: .\deploy-internal-monitor.ps1 -Uninstall" "Gray"
-Write-Status "   - To change timeout: .\deploy-internal-monitor.ps1 -InactivityTimeoutMinutes 15" "Gray"
-Write-Status "   - View logs: Get-Content `$env:TEMP\hibernation-monitor.log" "Gray"
