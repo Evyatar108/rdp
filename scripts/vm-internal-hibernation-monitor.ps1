@@ -65,40 +65,33 @@ public struct LASTINPUTINFO
 }
 function Invoke-VMHibernation {
     try {
-        # VM details - these will be injected by the deployment script
-        $resourceGroup = "VM-RG-TARGET"
-        $vmName = "DesktopVM"
+        Write-Host "Hibernating VM using Windows hibernation..." -ForegroundColor Green
         
-        Write-Host "Hibernating VM using Azure CLI..." -ForegroundColor Green
-        Write-Host "Running: az vm deallocate -g $resourceGroup -n $vmName --hibernate true" -ForegroundColor Gray
-        
-        # Use the same Azure CLI command as the external monitor
-        $hibernateOutput = az vm deallocate -g $resourceGroup -n $vmName --hibernate true 2>&1
-        $hibernateExitCode = $LASTEXITCODE
-        
-        if ($hibernateExitCode -eq 0) {
-            Write-Host "VM hibernated successfully!" -ForegroundColor Green
+        # Use local Windows hibernation methods
+        # First try the direct PowerShell method
+        try {
+            Write-Host "Attempting: Stop-Computer -Force -Hibernate" -ForegroundColor Gray
+            Stop-Computer -Force -Hibernate -ErrorAction Stop
             return $true
-        } else {
-            Write-Host "Azure hibernation failed with exit code: $hibernateExitCode" -ForegroundColor Red
-            Write-Host "Output: $hibernateOutput" -ForegroundColor Yellow
+        } catch {
+            Write-Host "PowerShell hibernation failed: $($_.Exception.Message)" -ForegroundColor Yellow
             
-            # Fall back to local hibernation methods as backup
-            Write-Host "Attempting local hibernation fallback..." -ForegroundColor Yellow
+            # Try using shutdown command as a fallback
             try {
-                Stop-Computer -Force -Hibernate -ErrorAction Stop
+                Write-Host "Attempting: shutdown /h /f" -ForegroundColor Gray
+                & shutdown /h /f
                 return $true
             } catch {
+                Write-Host "Shutdown hibernation failed: $($_.Exception.Message)" -ForegroundColor Yellow
+                
+                # As a last resort, try using rundll32
                 try {
-                    & shutdown /h /f
+                    Write-Host "Attempting: rundll32.exe powrprof.dll,SetSuspendState" -ForegroundColor Gray
+                    & rundll32.exe powrprof.dll,SetSuspendState 1,1,0
                     return $true
                 } catch {
-                    try {
-                        & rundll32.exe powrprof.dll,SetSuspendState 1,1,0
-                        return $true
-                    } catch {
-                        return $false
-                    }
+                    Write-Host "All hibernation methods failed" -ForegroundColor Red
+                    return $false
                 }
             }
         }
