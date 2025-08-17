@@ -20,18 +20,15 @@ function Ensure-AzureCLIAuthenticated {
     if (-not $currentAccount) {
         if (-not $Quiet) { Write-Host "⚠️ Not logged in to Azure" -ForegroundColor Yellow }
         $needsLogin = $true
-    }
-    elseif ($currentAccount.tenantId -ne $TenantId) {
+    } elseif ($currentAccount.tenantId -ne $TenantId) {
         if (-not $Quiet) { Write-Host ("⚠️ Wrong tenant (current: {0}, required: {1})" -f $currentAccount.tenantId, $TenantId) -ForegroundColor Yellow }
         $needsLogin = $true
-    }
-    elseif ($currentAccount.id -ne $SubscriptionId) {
+    } elseif ($currentAccount.id -ne $SubscriptionId) {
         if (-not $Quiet) { Write-Host ("⚠️ Wrong subscription (current: {0}, required: {1})" -f $currentAccount.id, $SubscriptionId) -ForegroundColor Yellow }
         # Just set the subscription, no need to re-login
         az account set --subscription $SubscriptionId
         if (-not $Quiet) { Write-Host "✅ Switched to correct subscription" -ForegroundColor Green }
-    }
-    else {
+    } else {
         if (-not $Quiet) { Write-Host "✅ Already authenticated to correct tenant and subscription" -ForegroundColor Green }
     }
 
@@ -67,8 +64,7 @@ function Ensure-AzureCLIInstalled {
                 if (-not $Quiet) { Write-Host "Azure CLI installed successfully" -ForegroundColor Green }
                 # Refresh PATH
                 $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::Machine) + ";" + [System.Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::User)
-            }
-            else {
+            } else {
                 throw "winget install failed with exit code: $LASTEXITCODE"
             }
         }
@@ -76,8 +72,7 @@ function Ensure-AzureCLIInstalled {
             Write-Host "Failed to install Azure CLI via winget: $_" -ForegroundColor Red
             throw "Azure CLI installation failed"
         }
-    }
-    else {
+    } else {
         if (-not $Quiet) { Write-Host "Azure CLI found at: $($azCliPath.Source)" -ForegroundColor Green }
     }
 }
