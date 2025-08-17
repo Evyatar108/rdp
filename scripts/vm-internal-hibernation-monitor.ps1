@@ -65,11 +65,9 @@ public struct LASTINPUTINFO
 }
 function Invoke-VMHibernation {
     try {
-        # Load Azure configuration to get VM details
-        . (Join-Path $PSScriptRoot "config-loader.ps1")
-        $config = Get-VMRdpConfig
-        $resourceGroup = $config.azure.target.resourceGroup
-        $vmName = $config.azure.target.vmName
+        # VM details - these will be injected by the deployment script
+        $resourceGroup = "VM-RG-TARGET"
+        $vmName = "DesktopVM"
         
         Write-Host "Hibernating VM using Azure CLI..." -ForegroundColor Green
         Write-Host "Running: az vm deallocate -g $resourceGroup -n $vmName --hibernate true" -ForegroundColor Gray
@@ -109,7 +107,6 @@ function Invoke-VMHibernation {
         return $false
     }
 }
-
 # Main monitoring loop
 $inactivityThresholdSeconds = $InactivityTimeoutMinutes * 60
 
