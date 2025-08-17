@@ -3,7 +3,8 @@
 # This provides backup hibernation when external RDP monitoring isn't available
 
 param(
-    [int]$InactivityTimeoutMinutes = 10,
+    [Parameter(Mandatory=$true)]
+    [int]$InactivityTimeoutMinutes,
     [int]$CheckIntervalSeconds = 60,
     [string]$LogFile = "C:\VMHibernation\hibernation-monitor.log"
 )
