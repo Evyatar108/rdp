@@ -8,6 +8,20 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
+
+# Load configuration for additional settings
+try {
+    . (Join-Path $PSScriptRoot "config-loader.ps1")
+    $config = Get-VMRdpConfig
+    $verboseOutput = $config.logging.verboseOutput
+    $showDetailedErrors = $config.logging.showDetailedErrors
+} catch {
+    # Fallback if config loading fails
+    $verboseOutput = $true
+    $showDetailedErrors = $true
+    Write-Host "Warning: Could not load configuration, using defaults" -ForegroundColor Yellow
+}
+
 $isVisible = $Visible -eq "true"
 
 try {
@@ -17,7 +31,12 @@ try {
     Write-Host "VM: $VM_NAME in $RG_B" -ForegroundColor Cyan
     $delayMinutes = [math]::Round($HIBERNATION_DELAY_SECONDS / 60, 1)
     Write-Host "Hibernation delay: $delayMinutes minutes after RDP closes" -ForegroundColor Cyan
-    Write-Host "Visible mode: $isVisible" -ForegroundColor Cyan
+    
+    if ($verboseOutput) {
+        Write-Host "Visible mode: $isVisible" -ForegroundColor Cyan
+        Write-Host "Verbose output: enabled" -ForegroundColor Cyan
+    }
+    
     Write-Host "Press Ctrl+C to cancel hibernation monitoring" -ForegroundColor Yellow
     Write-Host ""
     
@@ -83,9 +102,12 @@ try {
 } catch {
     Write-Host ""
     Write-Host "Error during hibernation monitoring: $_" -ForegroundColor Red
-    Write-Host "Error details: $($_.Exception.Message)" -ForegroundColor Yellow
-    if ($_.ScriptStackTrace) {
-        Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Gray
+    
+    if ($showDetailedErrors) {
+        Write-Host "Error details: $($_.Exception.Message)" -ForegroundColor Yellow
+        if ($_.ScriptStackTrace) {
+            Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Gray
+        }
     }
 } finally {
     # Always show final status and wait if visible, regardless of success or failure

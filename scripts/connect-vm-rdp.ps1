@@ -1,20 +1,32 @@
 $ErrorActionPreference = "Stop"
 
-# ----- CONFIGURATION SETTINGS -----
-# Azure Target Configuration
-$TENANT_B = "66d51e14-99b9-435a-8c05-449dc0c91710"
-$SUB_B = "30748a75-b2b8-4e4f-b5df-e87aa4ceef7b"
-$RG_B = "VM-RG-TARGET"
-$VM_NAME = "DesktopVM"
+# Load configuration
+. (Join-Path $PSScriptRoot "config-loader.ps1")
+$config = Get-VMRdpConfig
 
-# Auto-Hibernation Settings
-$HIBERNATION_DELAY_SECONDS = 120  # Wait 2 minutes after RDP closes before hibernating
-$PROGRESS_UPDATE_INTERVAL = 1     # Update countdown every 1 second
-$HIBERNATION_RESUME_WAIT = 30     # Wait 30 seconds after starting hibernated VM
-$MONITOR_WINDOW_VISIBLE = $true   # Set to $false to hide hibernation monitor window
+# Extract configuration values
+$TENANT_B = $config.azure.target.tenantId
+$SUB_B = $config.azure.target.subscriptionId
+$RG_B = $config.azure.target.resourceGroup
+$VM_NAME = $config.azure.target.vmName
+
+$HIBERNATION_DELAY_SECONDS = $config.hibernation.timing.delayAfterRdpCloseSeconds
+$PROGRESS_UPDATE_INTERVAL = $config.hibernation.timing.progressUpdateIntervalSeconds
+$HIBERNATION_RESUME_WAIT = $config.hibernation.timing.hibernationResumeWaitSeconds
+$MONITOR_WINDOW_VISIBLE = $config.hibernation.monitoring.windowVisible
 
 Write-Host "🖥️ Connecting to Azure VM via RDP..." -ForegroundColor Green
 Write-Host "====================================" -ForegroundColor Green
+
+if ($config.logging.verboseOutput) {
+    Write-Host "📋 Configuration loaded:" -ForegroundColor Cyan
+    Write-Host "   Tenant: $TENANT_B" -ForegroundColor Gray
+    Write-Host "   Subscription: $SUB_B" -ForegroundColor Gray
+    Write-Host "   Resource Group: $RG_B" -ForegroundColor Gray
+    Write-Host "   VM Name: $VM_NAME" -ForegroundColor Gray
+    Write-Host "   Hibernation Delay: $HIBERNATION_DELAY_SECONDS seconds" -ForegroundColor Gray
+    Write-Host ""
+}
 
 # Check current Azure context and login if needed
 Write-Host "📋 Checking Azure authentication..." -ForegroundColor Yellow
@@ -105,15 +117,14 @@ Write-Host "🖥️ Launching RDP connection..." -ForegroundColor Yellow
 $rdpProcess = Start-Process "mstsc" -ArgumentList "/v:$publicIP" -WindowStyle Normal -PassThru
 
 Write-Host "✅ RDP connection launched!" -ForegroundColor Green
-Write-Host "💡 Username: shabi108" -ForegroundColor Yellow
-Write-Host "🔐 Enter your password when prompted" -ForegroundColor Yellow
+Write-Host "🔐 Enter your credentials when prompted" -ForegroundColor Yellow
 
 # Start hibernation monitoring in separate window immediately after RDP launches
 Write-Host "`n🛌 Starting hibernation monitor in separate window..." -ForegroundColor Cyan
 $delayMinutes = [math]::Round($HIBERNATION_DELAY_SECONDS / 60, 1)
 Write-Host "   VM will hibernate $delayMinutes minutes after RDP window closes" -ForegroundColor Yellow
 
-# Get the directory where this script is located
+# Get the directory where this script is located (scripts folder)
 $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
 $hibernationMonitorScript = Join-Path $scriptDirectory "hibernation-monitor.ps1"
 
@@ -137,7 +148,15 @@ $monitorArguments = @(
     "-Visible $visibleParam"
 )
 
-$windowStyle = if ($MONITOR_WINDOW_VISIBLE) { "Normal" } else { "Hidden" }
+$windowStyle = if ($MONITOR_WINDOW_VISIBLE) {
+    if ($config.hibernation.monitoring.windowStyle) {
+        $config.hibernation.monitoring.windowStyle
+    } else {
+        "Normal"
+    }
+} else {
+    "Hidden"
+}
 $monitorProcess = Start-Process "powershell.exe" -ArgumentList $monitorArguments -WindowStyle $windowStyle -PassThru
 
 $visibilityText = if ($MONITOR_WINDOW_VISIBLE) { "visible" } else { "hidden" }
