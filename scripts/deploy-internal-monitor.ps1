@@ -36,6 +36,41 @@ function Install-InternalMonitor {
         throw "Configuration loading failed"
     }
 
+    # Check if Azure CLI is installed
+    $azCliPath = Get-Command az -ErrorAction SilentlyContinue
+    if (-not $azCliPath) {
+        Write-Host "Azure CLI not found. Installing Azure CLI..." -ForegroundColor Yellow
+        
+        # Download and install Azure CLI
+        try {
+            $installerUrl = "https://aka.ms/installazurecliwindows"
+            $installerPath = "$env:TEMP\AzureCLI.msi"
+            
+            Write-Host "Downloading Azure CLI installer..." -ForegroundColor Gray
+            Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath
+            
+            Write-Host "Installing Azure CLI (this may take a few minutes)..." -ForegroundColor Gray
+            Start-Process msiexec.exe -ArgumentList "/i `"$installerPath`" /quiet /norestart" -Wait
+            
+            # Refresh PATH
+            $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::Machine) + ";" + [System.Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::User)
+            
+            Write-Host "Azure CLI installed successfully" -ForegroundColor Green
+        } catch {
+            Write-Host "Failed to install Azure CLI: $_" -ForegroundColor Red
+            throw "Azure CLI installation failed"
+        }
+    } else {
+        Write-Host "Azure CLI found at: $($azCliPath.Source)" -ForegroundColor Green
+    }
+
+    # Authenticate Azure CLI
+    Write-Host "Configuring Azure CLI authentication..." -ForegroundColor Yellow
+    Write-Host "You need to authenticate Azure CLI for hibernation to work." -ForegroundColor Cyan
+    Write-Host "Please run these commands manually after the installation:" -ForegroundColor Yellow
+    Write-Host "  az login --tenant $($config.azure.target.tenantId)" -ForegroundColor Gray
+    Write-Host "  az account set --subscription $($config.azure.target.subscriptionId)" -ForegroundColor Gray
+
     # Create directory structure
     if (-not (Test-Path $VMPath)) {
         Write-Host "Creating directory: $VMPath" -ForegroundColor Green

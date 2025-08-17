@@ -65,35 +65,24 @@ public struct LASTINPUTINFO
 }
 function Invoke-VMHibernation {
     try {
-        Write-Host "Hibernating VM using Windows hibernation..." -ForegroundColor Green
+        # VM details - these will be injected by the deployment script
+        $resourceGroup = "VM-RG-TARGET"
+        $vmName = "DesktopVM"
         
-        # Use local Windows hibernation methods
-        # First try the direct PowerShell method
-        try {
-            Write-Host "Attempting: Stop-Computer -Force -Hibernate" -ForegroundColor Gray
-            Stop-Computer -Force -Hibernate -ErrorAction Stop
+        Write-Host "Hibernating VM using Azure CLI..." -ForegroundColor Green
+        Write-Host "Running: az vm deallocate -g $resourceGroup -n $vmName --hibernate true" -ForegroundColor Gray
+        
+        # Use the same Azure CLI command as the external monitor
+        $hibernateOutput = az vm deallocate -g $resourceGroup -n $vmName --hibernate true 2>&1
+        $hibernateExitCode = $LASTEXITCODE
+        
+        if ($hibernateExitCode -eq 0) {
+            Write-Host "VM hibernated successfully!" -ForegroundColor Green
             return $true
-        } catch {
-            Write-Host "PowerShell hibernation failed: $($_.Exception.Message)" -ForegroundColor Yellow
-            
-            # Try using shutdown command as a fallback
-            try {
-                Write-Host "Attempting: shutdown /h /f" -ForegroundColor Gray
-                & shutdown /h /f
-                return $true
-            } catch {
-                Write-Host "Shutdown hibernation failed: $($_.Exception.Message)" -ForegroundColor Yellow
-                
-                # As a last resort, try using rundll32
-                try {
-                    Write-Host "Attempting: rundll32.exe powrprof.dll,SetSuspendState" -ForegroundColor Gray
-                    & rundll32.exe powrprof.dll,SetSuspendState 1,1,0
-                    return $true
-                } catch {
-                    Write-Host "All hibernation methods failed" -ForegroundColor Red
-                    return $false
-                }
-            }
+        } else {
+            Write-Host "Azure hibernation failed with exit code: $hibernateExitCode" -ForegroundColor Red
+            Write-Host "Output: $hibernateOutput" -ForegroundColor Yellow
+            return $false
         }
     } catch {
         Write-Host "Error during hibernation: $($_.Exception.Message)" -ForegroundColor Red
