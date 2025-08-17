@@ -37,7 +37,7 @@ function Write-Status {
 }
 
 function Install-InternalMonitor {
-    Write-Status "🔧 Installing VM Internal Hibernation Monitor..." "Cyan"
+    Write-Status "Installing VM Internal Hibernation Monitor..." "Cyan"
     
     # Create directory structure
     if (-not (Test-Path $VMPath)) {
@@ -52,7 +52,7 @@ function Install-InternalMonitor {
     if (Test-Path $sourceScript) {
         Write-Status "Copying monitor script to VM..."
         Copy-Item $sourceScript $targetScript -Force
-        Write-Status "✅ Monitor script copied to: $targetScript"
+        Write-Status "Monitor script copied to: $targetScript"
     } else {
         throw "Source monitor script not found: $sourceScript"
     }
@@ -89,7 +89,7 @@ function Install-InternalMonitor {
     # Register the task
     try {
         Register-ScheduledTask -TaskName $taskName -Description $taskDescription -Action $action -Trigger $trigger -Settings $settings -Principal $principal | Out-Null
-        Write-Status "✅ Scheduled task '$taskName' created successfully"
+        Write-Status "Scheduled task '$taskName' created successfully"
     } catch {
         Write-Status "❌ Failed to create scheduled task: $_" "Red"
         throw "Scheduled task creation failed"
@@ -99,13 +99,13 @@ function Install-InternalMonitor {
     Write-Status "Starting hibernation monitor..."
     try {
         Start-ScheduledTask -TaskName $taskName
-        Write-Status "✅ Hibernation monitor started"
+        Write-Status "Hibernation monitor started"
     } catch {
-        Write-Status "⚠️ Failed to start task immediately: $_" "Yellow"
+        Write-Status "Failed to start task immediately: $_" "Yellow"
         Write-Status "   Task will start automatically on next boot" "Gray"
     }
     
-    Write-Status "✅ VM Internal Hibernation Monitor installed and started!" "Green"
+    Write-Status "VM Internal Hibernation Monitor installed and started!" "Green"
     Write-Status "   Monitor script: $targetScript" "Gray"
     Write-Status "   Inactivity timeout: $InactivityTimeoutMinutes minutes" "Gray"
     Write-Status "   Log file: $env:TEMP\hibernation-monitor.log" "Gray"
@@ -113,7 +113,7 @@ function Install-InternalMonitor {
 }
 
 function Uninstall-InternalMonitor {
-    Write-Status "🗑️ Uninstalling VM Internal Hibernation Monitor..." "Yellow"
+    Write-Status "Uninstalling VM Internal Hibernation Monitor..." "Yellow"
     
     $taskName = "VMHibernationMonitor"
     
@@ -123,7 +123,7 @@ function Uninstall-InternalMonitor {
         Write-Status "Stopping and removing scheduled task..."
         Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
         Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-        Write-Status "✅ Scheduled task removed"
+        Write-Status "Scheduled task removed"
     } else {
         Write-Status "No scheduled task found to remove"
     }
@@ -132,14 +132,14 @@ function Uninstall-InternalMonitor {
     if (Test-Path $VMPath) {
         Write-Status "Removing hibernation monitor files..."
         Remove-Item $VMPath -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Status "✅ Monitor files removed"
+        Write-Status "Monitor files removed"
     }
     
-    Write-Status "✅ VM Internal Hibernation Monitor uninstalled successfully!" "Green"
+    Write-Status "VM Internal Hibernation Monitor uninstalled successfully!" "Green"
 }
 
 function Show-Status {
-    Write-Status "📊 VM Internal Hibernation Monitor Status" "Cyan"
+    Write-Status "VM Internal Hibernation Monitor Status" "Cyan"
     Write-Status "=========================================" "Cyan"
     
     $taskName = "VMHibernationMonitor"
@@ -147,26 +147,26 @@ function Show-Status {
     
     if ($task) {
         $taskInfo = Get-ScheduledTaskInfo -TaskName $taskName
-        Write-Status "✅ Scheduled Task: $($task.State)" "Green"
+        Write-Status "Scheduled Task: $($task.State)" "Green"
         Write-Status "   Last Run: $($taskInfo.LastRunTime)" "Gray"
         Write-Status "   Next Run: $($taskInfo.NextRunTime)" "Gray"
         Write-Status "   Last Result: $($taskInfo.LastTaskResult)" "Gray"
     } else {
-        Write-Status "❌ Scheduled task not found" "Red"
+        Write-Status "Scheduled task not found" "Red"
     }
     
     $scriptPath = Join-Path $VMPath "vm-internal-hibernation-monitor.ps1"
     if (Test-Path $scriptPath) {
-        Write-Status "✅ Monitor script: Installed" "Green"
+        Write-Status "Monitor script: Installed" "Green"
         Write-Status "   Location: $scriptPath" "Gray"
     } else {
-        Write-Status "❌ Monitor script: Not found" "Red"
+        Write-Status "Monitor script: Not found" "Red"
     }
     
     $logPath = "$env:TEMP\hibernation-monitor.log"
     if (Test-Path $logPath) {
         $logSize = (Get-Item $logPath).Length
-        Write-Status "✅ Log file: $logSize bytes" "Green"
+        Write-Status "Log file: $logSize bytes" "Green"
         Write-Status "   Location: $logPath" "Gray"
         
         # Show last few log entries
@@ -178,7 +178,7 @@ function Show-Status {
             }
         }
     } else {
-        Write-Status "⚠️ Log file: Not found" "Yellow"
+        Write-Status "Log file: Not found" "Yellow"
     }
 }
 
@@ -192,7 +192,7 @@ if ($Uninstall) {
     # Check if running inside a VM
     $isVM = (Get-WmiObject -Class Win32_ComputerSystem).Model -match "Virtual|VMware|VirtualBox|Hyper-V"
     if (-not $isVM) {
-        Write-Status "⚠️ Warning: This doesn't appear to be running inside a VM" "Yellow"
+        Write-Status "Warning: This doesn't appear to be running inside a VM" "Yellow"
         Write-Status "   Continuing anyway..." "Yellow"
     }
     
