@@ -201,4 +201,4 @@ Write-Host "Usage Tips:" -ForegroundColor Yellow
 Write-Host "   - To check status: .\deploy-internal-monitor.ps1" -ForegroundColor Gray
 Write-Host "   - To uninstall: .\deploy-internal-monitor.ps1 -Uninstall" -ForegroundColor Gray
 Write-Host "   - To change timeout: .\deploy-internal-monitor.ps1 -InactivityTimeoutMinutes 15" -ForegroundColor Gray
-Write-Host "   - View logs: Get-Content `$env:TEMP\hibernation-monitor.log" -ForegroundColor Gray
+Write-Host "   - View logs: Get-Content `$($env:TEMP)\hibernation-monitor.log" -ForegroundColor Gray
