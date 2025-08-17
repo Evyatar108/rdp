@@ -28,7 +28,7 @@ if (-not (Test-Path $connectScript)) {
 }
 
 Write-Host "🖥️ Launching RDP connection script..." -ForegroundColor Cyan
-Write-Host "📁 Script: $connectScript" -ForegroundColor Gray
+Write-Host "Script: $connectScript" -ForegroundColor Gray
 
 # Execute the connect script
 & $connectScript
