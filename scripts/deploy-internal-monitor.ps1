@@ -24,6 +24,10 @@ if (-not (Test-Administrator)) {
     Write-Host "   1. Right-click on PowerShell" -ForegroundColor Gray
     Write-Host "   2. Select 'Run as Administrator'" -ForegroundColor Gray
     Write-Host "   3. Navigate to this directory and run the script again" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "🛡️ If you get execution policy errors, run this first:" -ForegroundColor Yellow
+    Write-Host "   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser" -ForegroundColor Gray
+    Write-Host "   Or run: powershell -ExecutionPolicy Bypass -File .\scripts\deploy-internal-monitor.ps1" -ForegroundColor Gray
     exit 1
 }
 
@@ -202,4 +206,4 @@ Write-Status "💡 Usage Tips:" "Yellow"
 Write-Status "   • To check status: .\deploy-internal-monitor.ps1" "Gray"
 Write-Status "   • To uninstall: .\deploy-internal-monitor.ps1 -Uninstall" "Gray"
 Write-Status "   • To change timeout: .\deploy-internal-monitor.ps1 -InactivityTimeoutMinutes 15" "Gray"
-Write-Status "   • View logs: Get-Content `$env:TEMP\hibernation-monitor.log" "Gray"
+Write-Status "   • View logs: Get-Content '$env:TEMP\hibernation-monitor.log'" "Gray"
