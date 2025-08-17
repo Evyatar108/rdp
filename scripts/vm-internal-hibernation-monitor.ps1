@@ -127,11 +127,13 @@ Write-Log "Monitoring for inactivity... (Press Ctrl+C to stop)"
 try {
     while ($true) {
         $idleSeconds = Get-SystemIdleTimeSeconds
-        
+        $idleMinutes = [math]::Round($idleSeconds / 60, 2)
+        Write-Log "System idle for $idleMinutes minutes."
+
         if ($idleSeconds -lt $inactivityThresholdSeconds) {
             # Activity detected, reset counter
             if ($consecutiveInactiveChecks -gt 0) {
-                Write-Log "User activity detected, resetting inactivity counter."
+                Write-Log "Inactivity counter reset."
                 $consecutiveInactiveChecks = 0
             }
             # Clear progress bar when activity is detected
@@ -139,8 +141,7 @@ try {
         } else {
             # No activity, increment counter and update progress
             $consecutiveInactiveChecks++
-            $idleMinutes = [math]::Round($idleSeconds / 60, 1)
-            Write-Log "No activity detected for $idleMinutes minutes (check $consecutiveInactiveChecks/$requiredInactiveChecks)"
+            Write-Log "Inactivity threshold met. Hibernation check $consecutiveInactiveChecks/$requiredInactiveChecks."
             
             # Show countdown progress bar
             $remainingSeconds = $inactivityThresholdSeconds - $idleSeconds
@@ -149,11 +150,11 @@ try {
             Write-Progress -Activity "VM Hibernation Monitor" -Status "Hibernating in $remainingMinutes minutes ($remainingSeconds seconds remaining)" -PercentComplete $percentComplete
             
             if ($consecutiveInactiveChecks -ge $requiredInactiveChecks) {
-                Write-Log "Inactivity threshold reached, hibernating VM..."
+                Write-Log "Hibernation threshold reached. Initiating hibernation..."
                 try { Write-Progress -Activity "VM Hibernation Monitor" -Completed -ErrorAction SilentlyContinue } catch {}
                 
                 if (Invoke-VMHibernation) {
-                    Write-Log "VM hibernation initiated successfully"
+                    Write-Log "VM hibernation initiated successfully."
                     break
                 } else {
                     Write-Log "Failed to hibernate VM, continuing monitoring..."
