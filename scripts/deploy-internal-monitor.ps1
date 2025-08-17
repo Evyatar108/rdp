@@ -68,8 +68,7 @@ function Install-InternalMonitor {
     # Create task settings
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RunOnlyIfNetworkAvailable:$false
     $settings.ExecutionTimeLimit = "PT0S"   # No time limit; run indefinitely
-    $settings.RestartInterval = (New-TimeSpan -Minutes 1)     # Restart every 1 minute if it ends unexpectedly
-    $settings.RestartCount = 999            # Keep retrying
+    $settings.RestartCount = 0              # Disable engine restarts; rely on repeating trigger
     $settings.MultipleInstances = "IgnoreNew"  # Prevent duplicate instances
 
     # Create task principal (run in interactive user session so window is visible)
