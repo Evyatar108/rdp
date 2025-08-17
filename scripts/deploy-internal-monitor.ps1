@@ -118,7 +118,6 @@ try {
     Write-Host "  Inactivity timeout: $timeoutFromConfig minutes" -ForegroundColor Gray
     Write-Host "  Log file: $monitorLog" -ForegroundColor Gray
     Write-Host "  Scheduled task: $taskName" -ForegroundColor Gray
-}
 
 function Uninstall-InternalMonitor {
     Write-Host "Uninstalling VM Internal Hibernation Monitor..." -ForegroundColor Yellow
