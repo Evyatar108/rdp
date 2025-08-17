@@ -13,7 +13,7 @@ $VM_NAME = $config.azure.target.vmName
 $HIBERNATION_DELAY_SECONDS = $config.hibernation.timing.delayAfterRdpCloseSeconds
 $PROGRESS_UPDATE_INTERVAL = $config.hibernation.timing.progressUpdateIntervalSeconds
 $HIBERNATION_RESUME_WAIT = $config.hibernation.timing.hibernationResumeWaitSeconds
-$MONITOR_WINDOW_VISIBLE = $config.hibernation.monitoring.windowVisible
+$MONITOR_WINDOW_VISIBLE = $config.hibernation.showMonitorWindow
 
 Write-Host "🖥️ Connecting to Azure VM via RDP..." -ForegroundColor Green
 Write-Host "====================================" -ForegroundColor Green
@@ -148,15 +148,7 @@ $monitorArguments = @(
     "-Visible $visibleParam"
 )
 
-$windowStyle = if ($MONITOR_WINDOW_VISIBLE) {
-    if ($config.hibernation.monitoring.windowStyle) {
-        $config.hibernation.monitoring.windowStyle
-    } else {
-        "Normal"
-    }
-} else {
-    "Hidden"
-}
+$windowStyle = if ($MONITOR_WINDOW_VISIBLE) { "Normal" } else { "Hidden" }
 $monitorProcess = Start-Process "powershell.exe" -ArgumentList $monitorArguments -WindowStyle $windowStyle -PassThru
 
 $visibilityText = if ($MONITOR_WINDOW_VISIBLE) { "visible" } else { "hidden" }

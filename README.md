@@ -75,10 +75,7 @@ All settings are managed through a single JSON configuration file: **[`config.js
       "progressUpdateIntervalSeconds": 1,
       "hibernationResumeWaitSeconds": 30
     },
-    "monitoring": {
-      "windowVisible": true,
-      "windowStyle": "Normal"
-    }
+    "showMonitorWindow": true
   }
 }
 ```
@@ -102,10 +99,6 @@ All settings are managed through a single JSON configuration file: **[`config.js
 #### **Other Settings:**
 ```json
 {
-  "rdp": {
-    "connection": {
-    }
-  },
   "logging": {
     "verboseOutput": true,
     "showDetailedErrors": true

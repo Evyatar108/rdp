@@ -9,14 +9,11 @@
   },
   "hibernation": {
     "timing": {
-      "delayAfterRdpCloseSeconds": 120,
+      "delayAfterRdpCloseSeconds": 10,
       "progressUpdateIntervalSeconds": 1,
       "hibernationResumeWaitSeconds": 30
     },
-    "monitoring": {
-      "windowVisible": true,
-      "windowStyle": "Normal"
-    }
+    "showMonitorWindow": false
   },
   "autoUpdate": {
     "enabled": true,
@@ -26,10 +23,6 @@
         "C:\\Program Files\\Git\\cmd",
         "C:\\Program Files (x86)\\Git\\cmd"
       ]
-    }
-  },
-  "rdp": {
-    "connection": {
     }
   },
   "logging": {

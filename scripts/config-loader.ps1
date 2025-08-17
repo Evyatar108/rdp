@@ -9,7 +9,18 @@ function Get-VMRdpConfig {
     # Determine config file path
     if (-not $ConfigPath) {
         # Get the root directory (go up one level from scripts folder)
-        $rootDirectory = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        $scriptDirectory = Split-Path -Parent $PSScriptRoot
+        if ($scriptDirectory -and (Test-Path $scriptDirectory)) {
+            $rootDirectory = $scriptDirectory
+        } else {
+            # Fallback: use the directory where the calling script is located
+            $callingScript = $MyInvocation.PSCommandPath
+            if ($callingScript) {
+                $rootDirectory = Split-Path -Parent $callingScript
+            } else {
+                $rootDirectory = Get-Location
+            }
+        }
         $ConfigPath = Join-Path $rootDirectory "config.json"
     }
     
@@ -59,11 +70,8 @@ function Get-VMRdpConfig {
             $config.hibernation.timing | Add-Member -Type NoteProperty -Name "hibernationResumeWaitSeconds" -Value 30
         }
         
-        if (-not $config.hibernation.monitoring) {
-            $config.hibernation | Add-Member -Type NoteProperty -Name "monitoring" -Value @{}
-        }
-        if (-not $config.hibernation.monitoring.windowVisible) {
-            $config.hibernation.monitoring | Add-Member -Type NoteProperty -Name "windowVisible" -Value $true
+        if (-not (Get-Member -InputObject $config.hibernation -Name "showMonitorWindow" -MemberType Properties)) {
+            $config.hibernation | Add-Member -Type NoteProperty -Name "showMonitorWindow" -Value $true
         }
         
         if (-not $config.autoUpdate.enabled) {
@@ -93,5 +101,5 @@ function Get-VMRdpConfig {
     }
 }
 
-# Export the function for use by other scripts
-Export-ModuleMember -Function Get-VMRdpConfig
+# Function is available after dot-sourcing this script
+# No Export-ModuleMember needed for dot-sourced scripts
