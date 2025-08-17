@@ -71,7 +71,7 @@ function Install-Git {
             foreach ($gitPath in $GIT_INSTALL_PATHS) {
                 if (Test-Path $gitPath) {
                     $env:Path += ";" + $gitPath
-                    Write-Host "✅ Git path added to current session: $gitPath" -ForegroundColor Green
+                    Write-Host "Git path added to current session: $gitPath" -ForegroundColor Green
                     $gitFound = $true
                     break
                 }
@@ -176,6 +176,6 @@ if ($AUTO_UPDATE_ENABLED) {
         Set-Location $currentLocation
     }
 } else {
-    Write-Host "ℹ️ Auto-update disabled - using current scripts" -ForegroundColor Gray
+    Write-Host "Auto-update disabled - using current scripts" -ForegroundColor Gray
     return $false  # Updates disabled
 }
