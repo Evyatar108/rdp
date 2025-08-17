@@ -46,8 +46,7 @@ function Ensure-AzureCLIAuthenticated {
             throw "Failed to set correct subscription context. Expected: $SubscriptionId, Got: $currentSub"
         }
         if (-not $Quiet) { Write-Host "✅ Successfully authenticated and set context to subscription: $SubscriptionId" -ForegroundColor Green }
-    }
-    else {
+    } else {
         if (-not $Quiet) { Write-Host "✅ Using existing authentication context" -ForegroundColor Green }
     }
 }
