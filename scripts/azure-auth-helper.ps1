@@ -22,11 +22,11 @@ function Ensure-AzureCLIAuthenticated {
         $needsLogin = $true
     }
     elseif ($currentAccount.tenantId -ne $TenantId) {
-        if (-not $Quiet) { Write-Host "⚠️ Wrong tenant (current: $($currentAccount.tenantId), required: $TenantId)" -ForegroundColor Yellow }
+        if (-not $Quiet) { Write-Host ("⚠️ Wrong tenant (current: {0}, required: {1})" -f $currentAccount.tenantId, $TenantId) -ForegroundColor Yellow }
         $needsLogin = $true
     }
     elseif ($currentAccount.id -ne $SubscriptionId) {
-        if (-not $Quiet) { Write-Host "⚠️ Wrong subscription (current: $($currentAccount.id), required: $SubscriptionId)" -ForegroundColor Yellow }
+        if (-not $Quiet) { Write-Host ("⚠️ Wrong subscription (current: {0}, required: {1})" -f $currentAccount.id, $SubscriptionId) -ForegroundColor Yellow }
         # Just set the subscription, no need to re-login
         az account set --subscription $SubscriptionId
         if (-not $Quiet) { Write-Host "✅ Switched to correct subscription" -ForegroundColor Green }
@@ -43,7 +43,7 @@ function Ensure-AzureCLIAuthenticated {
         # Verify context
         $currentSub = az account show --query "id" -o tsv
         if ($currentSub -ne $SubscriptionId) {
-            throw "Failed to set correct subscription context. Expected: $SubscriptionId, Got: $currentSub"
+            throw ("Failed to set correct subscription context. Expected: {0}, Got: {1}" -f $SubscriptionId, $currentSub)
         }
         if (-not $Quiet) { Write-Host "✅ Successfully authenticated and set context to subscription: $SubscriptionId" -ForegroundColor Green }
     } else {
