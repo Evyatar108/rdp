@@ -20,14 +20,17 @@ function Ensure-AzureCLIInstalled {
                 if (-not $azCliPath -and -not $Quiet) {
                     Write-Host "⚠️ Azure CLI installed but not yet in PATH. A new session may be required." -ForegroundColor Yellow
                 }
-            } else {
+            }
+            else {
                 throw "winget install failed with exit code: $LASTEXITCODE"
             }
-        } catch {
+        }
+        catch {
             Write-Host "❌ Failed to install Azure CLI via winget: $_" -ForegroundColor Red
             throw "Azure CLI installation failed"
         }
-    } else {
+    }
+    else {
         if (-not $Quiet) { Write-Host "✅ Azure CLI found at: $($azCliPath.Source)" -ForegroundColor Green }
     }
 }
