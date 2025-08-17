@@ -27,12 +27,14 @@ try {
         if ($isVisible) {
             Write-Host "Press Enter to close this window..." -ForegroundColor Yellow
             Read-Host
-        } else {
+        }
+        else {
             Start-Sleep -Seconds 5
         }
         exit 0
     }
-} catch {
+}
+catch {
     # Fallback if config loading fails
     $verboseOutput = $true
     $showDetailedErrors = $true
@@ -88,7 +90,7 @@ try {
     Write-Host "   (Press Ctrl+C to cancel hibernation)" -ForegroundColor Gray
     
     for ($i = $HIBERNATION_DELAY_SECONDS; $i -gt 0; $i--) {
-        Write-Progress -Activity "Auto-hibernation countdown" -Status "$i seconds remaining" -PercentComplete (($HIBERNATION_DELAY_SECONDS-$i)/$HIBERNATION_DELAY_SECONDS*100)
+        Write-Progress -Activity "Auto-hibernation countdown" -Status "$i seconds remaining" -PercentComplete (($HIBERNATION_DELAY_SECONDS - $i) / $HIBERNATION_DELAY_SECONDS * 100)
         Start-Sleep -Seconds $PROGRESS_UPDATE_INTERVAL
     }
     
@@ -107,16 +109,19 @@ try {
         Write-Host "VM hibernated successfully!" -ForegroundColor Green
         Write-Host "VM is now in hibernated state (no compute charges)" -ForegroundColor Cyan
         Write-Host "Run connect-vm-rdp.ps1 again to resume and reconnect" -ForegroundColor Yellow
-    } else {
+    }
+    else {
         Write-Host "Hibernation command failed with exit code: $hibernateExitCode" -ForegroundColor Red
         Write-Host "Output: $hibernateOutput" -ForegroundColor Yellow
     }
     
-} catch [System.Management.Automation.PipelineStoppedException] {
+}
+catch [System.Management.Automation.PipelineStoppedException] {
     Write-Host ""
     Write-Host "Auto-hibernation cancelled by user" -ForegroundColor Yellow
     Write-Host "VM remains running" -ForegroundColor Cyan
-} catch {
+}
+catch {
     Write-Host ""
     Write-Host "Error during hibernation monitoring: $_" -ForegroundColor Red
     
@@ -126,7 +131,8 @@ try {
             Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Gray
         }
     }
-} finally {
+}
+finally {
     # Always show final status and wait if visible, regardless of success or failure
     Write-Host ""
     Write-Host "Hibernation monitor finished." -ForegroundColor Gray
@@ -135,11 +141,13 @@ try {
         Write-Host "Press Enter to close this window..." -ForegroundColor Yellow
         try {
             Read-Host
-        } catch {
+        }
+        catch {
             # In case Read-Host fails for any reason
             Start-Sleep -Seconds 30
         }
-    } else {
+    }
+    else {
         Write-Host "Window will close in 5 seconds..." -ForegroundColor Gray
         Start-Sleep -Seconds 5
     }

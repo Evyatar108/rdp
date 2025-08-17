@@ -50,7 +50,8 @@ $osSnapExists = az snapshot show -g $RG_A -n "osdisk-snap" --query "name" -o tsv
 if (-not $osSnapExists) {
     Write-Host "Creating OS disk snapshot..."
     az snapshot create -g $RG_A -n "osdisk-snap" --source $OS_DISK_ID --sku Standard_LRS --location $LOC
-} else {
+}
+else {
     Write-Host "OS disk snapshot 'osdisk-snap' already exists, skipping creation."
 }
 
@@ -58,7 +59,8 @@ $dataSnapExists = az snapshot show -g $RG_A -n "data0-snap" --query "name" -o ts
 if (-not $dataSnapExists) {
     Write-Host "Creating data disk snapshot..."
     az snapshot create -g $RG_A -n "data0-snap" --source $DATA0_DISK_ID --sku Standard_LRS --location $LOC
-} else {
+}
+else {
     Write-Host "Data disk snapshot 'data0-snap' already exists, skipping creation."
 }
 
@@ -82,10 +84,12 @@ if (Test-Path $sasOsCacheFile) {
         if ($expiryTime -gt (Get-Date).AddMinutes(120)) {
             $SRC_OS_SAS = $cachedSasData.SasUrl
             Write-Host "Using cached OS snapshot SAS token (expires: $($cachedSasData.Expiry))"
-        } else {
+        }
+        else {
             Write-Host "Cached OS snapshot SAS token expired, will generate new one"
         }
-    } catch {
+    }
+    catch {
         Write-Host "Invalid cached OS SAS data, will generate new token"
     }
 }
@@ -97,10 +101,12 @@ if (Test-Path $sasDataCacheFile) {
         if ($expiryTime -gt (Get-Date).AddMinutes(120)) {
             $SRC_DATA0_SAS = $cachedSasData.SasUrl
             Write-Host "Using cached data snapshot SAS token (expires: $($cachedSasData.Expiry))"
-        } else {
+        }
+        else {
             Write-Host "Cached data snapshot SAS token expired, will generate new one"
         }
-    } catch {
+    }
+    catch {
         Write-Host "Invalid cached data SAS data, will generate new token"
     }
 }
@@ -109,13 +115,13 @@ if (Test-Path $sasDataCacheFile) {
 if (-not $SRC_OS_SAS) {
     Write-Host "Generating new OS snapshot SAS token..."
     $SRC_OS_SAS = az snapshot grant-access -g $RG_A -n "osdisk-snap" `
-      --access-level Read --duration-in-seconds 86400 -o tsv --query accessSas
+        --access-level Read --duration-in-seconds 86400 -o tsv --query accessSas
     
     # Cache the SAS token
     $sasCache = @{
-        SasUrl = $SRC_OS_SAS
-        Expiry = $EXPIRY_OS
-        Generated = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
+        SasUrl       = $SRC_OS_SAS
+        Expiry       = $EXPIRY_OS
+        Generated    = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
         SnapshotName = "osdisk-snap"
     }
     $sasCache | ConvertTo-Json -Depth 2 | Set-Content $sasOsCacheFile
@@ -125,13 +131,13 @@ if (-not $SRC_OS_SAS) {
 if (-not $SRC_DATA0_SAS) {
     Write-Host "Generating new data snapshot SAS token..."
     $SRC_DATA0_SAS = az snapshot grant-access -g $RG_A -n "data0-snap" `
-      --access-level Read --duration-in-seconds 86400 -o tsv --query accessSas
+        --access-level Read --duration-in-seconds 86400 -o tsv --query accessSas
     
     # Cache the SAS token
     $sasCache = @{
-        SasUrl = $SRC_DATA0_SAS
-        Expiry = $EXPIRY_DATA
-        Generated = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
+        SasUrl       = $SRC_DATA0_SAS
+        Expiry       = $EXPIRY_DATA
+        Generated    = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
         SnapshotName = "data0-snap"
     }
     $sasCache | ConvertTo-Json -Depth 2 | Set-Content $sasDataCacheFile
@@ -148,7 +154,8 @@ $rgExists = az group exists -n $RG_B
 if ($rgExists -eq "false") {
     Write-Host "Creating resource group '$RG_B'..."
     az group create -n $RG_B -l $LOC
-} else {
+}
+else {
     Write-Host "Resource group '$RG_B' already exists, skipping creation."
 }
 
@@ -156,7 +163,8 @@ $saExists = az storage account show -g $RG_B -n $SA_B --query "name" -o tsv 2>$n
 if (-not $saExists) {
     Write-Host "Creating storage account '$SA_B'..."
     az storage account create -g $RG_B -n $SA_B -l $LOC --sku Standard_LRS --kind StorageV2
-} else {
+}
+else {
     Write-Host "Storage account '$SA_B' already exists, skipping creation."
 }
 
@@ -164,7 +172,8 @@ $containerExists = az storage container exists --account-name $SA_B --name $CONT
 if ($containerExists -eq "false" -or -not $containerExists) {
     Write-Host "Creating storage container '$CONTAINER'..."
     az storage container create --account-name $SA_B --name $CONTAINER
-} else {
+}
+else {
     Write-Host "Storage container '$CONTAINER' already exists, skipping creation."
 }
 
@@ -182,12 +191,15 @@ if (Test-Path $sasContainerCacheFile) {
         if ($expiryTime -gt (Get-Date).AddMinutes(10) -and $permissionsMatch) {
             $DST_CONTAINER_SAS = $cachedSasData.SasUrl
             Write-Host "Using cached container SAS token (expires: $($cachedSasData.Expiry), permissions: $($cachedSasData.Permissions))"
-        } elseif (-not $permissionsMatch) {
+        }
+        elseif (-not $permissionsMatch) {
             Write-Host "Cached container SAS token has different permissions ($($cachedSasData.Permissions) vs $requiredPermissions), will generate new one"
-        } else {
+        }
+        else {
             Write-Host "Cached container SAS token expired, will generate new one"
         }
-    } catch {
+    }
+    catch {
         Write-Host "Invalid cached container SAS data, will generate new token"
     }
 }
@@ -195,17 +207,17 @@ if (Test-Path $sasContainerCacheFile) {
 if (-not $DST_CONTAINER_SAS) {
     Write-Host "Generating new container SAS token with permissions: $requiredPermissions..."
     $DST_CONTAINER_SAS = az storage container generate-sas `
-      --account-name $SA_B --name $CONTAINER `
-      --permissions $requiredPermissions --expiry $EXPIRY_DST -o tsv
+        --account-name $SA_B --name $CONTAINER `
+        --permissions $requiredPermissions --expiry $EXPIRY_DST -o tsv
     
     # Cache the SAS token with permissions info
     $sasCache = @{
-        SasUrl = $DST_CONTAINER_SAS
-        Expiry = $EXPIRY_DST
-        Permissions = $requiredPermissions
-        Generated = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
+        SasUrl         = $DST_CONTAINER_SAS
+        Expiry         = $EXPIRY_DST
+        Permissions    = $requiredPermissions
+        Generated      = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
         StorageAccount = $SA_B
-        Container = $CONTAINER
+        Container      = $CONTAINER
     }
     $sasCache | ConvertTo-Json -Depth 2 | Set-Content $sasContainerCacheFile
     Write-Host "Container SAS token cached to: $sasContainerCacheFile"
@@ -229,7 +241,8 @@ Write-Host "Configured AzCopy to use SAS-only authentication for cross-tenant co
 $osVhdExists = az storage blob exists --account-name $SA_B --container-name $CONTAINER --name $OS_VHD --query "exists" -o tsv 2>$null
 if ($osVhdExists -eq "true") {
     Write-Host "OS VHD '$OS_VHD' already exists in destination, skipping copy."
-} else {
+}
+else {
     Write-Host "Starting OS disk copy..."
     Write-Host "Source (Tenant A): $($SRC_OS_SAS.Substring(0, 50))..."
     Write-Host "Destination (Tenant B): $($DST_OS.Substring(0, 50))..."
@@ -240,7 +253,8 @@ if ($osVhdExists -eq "true") {
 $dataVhdExists = az storage blob exists --account-name $SA_B --container-name $CONTAINER --name $DATA0_VHD --query "exists" -o tsv 2>$null
 if ($dataVhdExists -eq "true") {
     Write-Host "Data VHD '$DATA0_VHD' already exists in destination, skipping copy."
-} else {
+}
+else {
     Write-Host "Starting data disk copy..."
     Write-Host "Source (Tenant A): $($SRC_DATA0_SAS.Substring(0, 50))..."
     Write-Host "Destination (Tenant B): $($DST_DATA0.Substring(0, 50))..."
@@ -252,9 +266,10 @@ $osDiskExists = az disk show -g $RG_B -n "DesktopVM-OS-Managed" --query "name" -
 if (-not $osDiskExists) {
     Write-Host "Creating OS managed disk 'DesktopVM-OS-Managed'..."
     az disk create -g $RG_B -n "DesktopVM-OS-Managed" `
-      --source "https://$SA_B.blob.core.windows.net/$CONTAINER/$OS_VHD" `
-      --os-type Windows --sku Standard_LRS --location $LOC
-} else {
+        --source "https://$SA_B.blob.core.windows.net/$CONTAINER/$OS_VHD" `
+        --os-type Windows --sku Standard_LRS --location $LOC
+}
+else {
     Write-Host "OS managed disk 'DesktopVM-OS-Managed' already exists, skipping creation."
 }
 
@@ -263,9 +278,10 @@ $dataDiskExists = az disk show -g $RG_B -n "DesktopVM-Data0-Managed" --query "na
 if (-not $dataDiskExists) {
     Write-Host "Creating data managed disk 'DesktopVM-Data0-Managed'..."
     az disk create -g $RG_B -n "DesktopVM-Data0-Managed" `
-      --source "https://$SA_B.blob.core.windows.net/$CONTAINER/$DATA0_VHD" `
-      --sku Standard_LRS --location $LOC
-} else {
+        --source "https://$SA_B.blob.core.windows.net/$CONTAINER/$DATA0_VHD" `
+        --sku Standard_LRS --location $LOC
+}
+else {
     Write-Host "Data managed disk 'DesktopVM-Data0-Managed' already exists, skipping creation."
 }
 
@@ -274,8 +290,9 @@ $vnetExists = az network vnet show -g $RG_B -n "vnet-DesktopVM" --query "name" -
 if (-not $vnetExists) {
     Write-Host "Creating VNet 'vnet-DesktopVM' with subnet..."
     az network vnet create -g $RG_B -n "vnet-DesktopVM" --address-prefix 10.10.0.0/16 `
-      --subnet-name "snet-desktopvm" --subnet-prefix 10.10.1.0/24
-} else {
+        --subnet-name "snet-desktopvm" --subnet-prefix 10.10.1.0/24
+}
+else {
     Write-Host "VNet 'vnet-DesktopVM' already exists, skipping creation."
 }
 
@@ -284,7 +301,8 @@ $pipExists = az network public-ip show -g $RG_B -n "pip-desktopvm" --query "name
 if (-not $pipExists) {
     Write-Host "Creating public IP 'pip-desktopvm'..."
     az network public-ip create -g $RG_B -n "pip-desktopvm" --sku Basic --version IPv4
-} else {
+}
+else {
     Write-Host "Public IP 'pip-desktopvm' already exists, skipping creation."
 }
 
@@ -293,9 +311,10 @@ $nicExists = az network nic show -g $RG_B -n "nic-desktopvm" --query "name" -o t
 if (-not $nicExists) {
     Write-Host "Creating NIC 'nic-desktopvm'..."
     az network nic create -g $RG_B -n "nic-desktopvm" `
-      --vnet-name "vnet-DesktopVM" --subnet "snet-desktopvm" `
-      --public-ip-address "pip-desktopvm"
-} else {
+        --vnet-name "vnet-DesktopVM" --subnet "snet-desktopvm" `
+        --public-ip-address "pip-desktopvm"
+}
+else {
     Write-Host "NIC 'nic-desktopvm' already exists, skipping creation."
 }
 
@@ -305,16 +324,17 @@ $vmExists = az vm show -g $RG_B -n "DesktopVM" --query "name" -o tsv 2>$null
 if (-not $vmExists) {
     Write-Host "Creating VM 'DesktopVM'..."
     az vm create -g $RG_B -n "DesktopVM" `
-      --attach-os-disk "DesktopVM-OS-Managed" `
-      --os-type windows `
-      --size "Standard_A2m_v2" `
-      --nics "nic-desktopvm"
+        --attach-os-disk "DesktopVM-OS-Managed" `
+        --os-type windows `
+        --size "Standard_A2m_v2" `
+        --nics "nic-desktopvm"
 
     # Attach data disk
     Write-Host "Attaching data disk to VM..."
     az vm disk attach -g $RG_B --vm-name "DesktopVM" `
-      --name "DesktopVM-Data0-Managed" --lun 0 --caching None
-} else {
+        --name "DesktopVM-Data0-Managed" --lun 0 --caching None
+}
+else {
     Write-Host "VM 'DesktopVM' already exists, skipping creation."
     
     # Check if data disk is already attached
@@ -322,8 +342,9 @@ if (-not $vmExists) {
     if (-not $dataDiskAttached) {
         Write-Host "Attaching data disk to existing VM..."
         az vm disk attach -g $RG_B --vm-name "DesktopVM" `
-          --name "DesktopVM-Data0-Managed" --lun 0 --caching None
-    } else {
+            --name "DesktopVM-Data0-Managed" --lun 0 --caching None
+    }
+    else {
         Write-Host "Data disk already attached to VM."
     }
 }

@@ -12,12 +12,14 @@ function Get-VMRdpConfig {
         $scriptDirectory = Split-Path -Parent $PSScriptRoot
         if ($scriptDirectory -and (Test-Path $scriptDirectory)) {
             $rootDirectory = $scriptDirectory
-        } else {
+        }
+        else {
             # Fallback: use the directory where the calling script is located
             $callingScript = $MyInvocation.PSCommandPath
             if ($callingScript) {
                 $rootDirectory = Split-Path -Parent $callingScript
-            } else {
+            }
+            else {
                 $rootDirectory = Get-Location
             }
         }
@@ -93,8 +95,8 @@ function Get-VMRdpConfig {
         }
         
         return $config
-        
-    } catch {
+    }
+    catch {
         Write-Host "❌ Error loading configuration: $_" -ForegroundColor Red
         Write-Host "💡 Please check that config.json is valid JSON format" -ForegroundColor Yellow
         throw "Configuration loading failed: $_"

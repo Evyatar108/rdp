@@ -3,7 +3,7 @@
 # This provides backup hibernation when external RDP monitoring isn't available
 
 param(
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [int]$InactivityTimeoutMinutes,
     [int]$CheckIntervalSeconds = 60,
     [string]$LogFile = "C:\VMHibernation\hibernation-monitor.log"
@@ -53,12 +53,14 @@ public struct LASTINPUTINFO
             $idleMilliseconds = $currentTicks - $lastInputTicks
             
             return [math]::Max(0, [math]::Round($idleMilliseconds / 1000))
-        } else {
+        }
+        else {
             # If the API call fails, get the last Win32 error for logging
             $win32Error = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
             throw (New-Object System.ComponentModel.Win32Exception $win32Error)
         }
-    } catch {
+    }
+    catch {
         Write-Log "ERROR getting idle time: $($_.Exception.Message). Assuming activity to be safe."
         return 0 # Fail safe: if we can't get idle time, assume the user is active.
     }
@@ -79,12 +81,14 @@ function Invoke-VMHibernation {
         if ($hibernateExitCode -eq 0) {
             Write-Host "VM hibernated successfully!" -ForegroundColor Green
             return $true
-        } else {
+        }
+        else {
             Write-Host "Azure hibernation failed with exit code: $hibernateExitCode" -ForegroundColor Red
             Write-Host "Output: $hibernateOutput" -ForegroundColor Yellow
             return $false
         }
-    } catch {
+    }
+    catch {
         Write-Host "Error during hibernation: $($_.Exception.Message)" -ForegroundColor Red
         return $false
     }
@@ -116,8 +120,10 @@ try {
         
         Start-Sleep -Seconds $CheckIntervalSeconds
     }
-} catch {
+}
+catch {
     # Catch Ctrl+C or other terminating errors
-} finally {
+}
+finally {
     try { Write-Progress -Activity "VM Auto-Hibernation Monitor" -Completed -ErrorAction SilentlyContinue } catch {}
 }

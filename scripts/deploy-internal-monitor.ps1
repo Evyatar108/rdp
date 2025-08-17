@@ -30,46 +30,20 @@ function Install-InternalMonitor {
         $config = Get-VMRdpConfig
         $timeoutFromConfig = $config.hibernation.internal.inactivityTimeoutMinutes
         Write-Host "Loaded inactivity timeout from config: $timeoutFromConfig minutes" -ForegroundColor Green
-    } catch {
+    }
+    catch {
         Write-Host "ERROR: Could not load configuration: $_" -ForegroundColor Red
         Write-Host "The internal monitor requires a valid config.json file." -ForegroundColor Red
         throw "Configuration loading failed"
     }
 
-    # Check if Azure CLI is installed
-    $azCliPath = Get-Command az -ErrorAction SilentlyContinue
-    if (-not $azCliPath) {
-        Write-Host "Azure CLI not found. Installing Azure CLI..." -ForegroundColor Yellow
-        
-        # Download and install Azure CLI
-        try {
-            $installerUrl = "https://aka.ms/installazurecliwindows"
-            $installerPath = "$env:TEMP\AzureCLI.msi"
-            
-            Write-Host "Downloading Azure CLI installer..." -ForegroundColor Gray
-            Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath
-            
-            Write-Host "Installing Azure CLI (this may take a few minutes)..." -ForegroundColor Gray
-            Start-Process msiexec.exe -ArgumentList "/i `"$installerPath`" /quiet /norestart" -Wait
-            
-            # Refresh PATH
-            $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::Machine) + ";" + [System.Environment]::GetEnvironmentVariable("PATH", [System.EnvironmentVariableTarget]::User)
-            
-            Write-Host "Azure CLI installed successfully" -ForegroundColor Green
-        } catch {
-            Write-Host "Failed to install Azure CLI: $_" -ForegroundColor Red
-            throw "Azure CLI installation failed"
-        }
-    } else {
-        Write-Host "Azure CLI found at: $($azCliPath.Source)" -ForegroundColor Green
-    }
-
-    # Authenticate Azure CLI
-    Write-Host "Configuring Azure CLI authentication..." -ForegroundColor Yellow
-    Write-Host "You need to authenticate Azure CLI for hibernation to work." -ForegroundColor Cyan
-    Write-Host "Please run these commands manually after the installation:" -ForegroundColor Yellow
-    Write-Host "  az login --tenant $($config.azure.target.tenantId)" -ForegroundColor Gray
-    Write-Host "  az account set --subscription $($config.azure.target.subscriptionId)" -ForegroundColor Gray
+    # Load shared Azure authentication helper
+    . (Join-Path $PSScriptRoot "azure-auth-helper.ps1")
+    
+    # Ensure Azure CLI is available and authenticated
+    Write-Host "Setting up Azure CLI..." -ForegroundColor Yellow
+    Ensure-AzureCLIInstalled
+    Ensure-AzureCLIAuthenticated -TenantId $config.azure.target.tenantId -SubscriptionId $config.azure.target.subscriptionId
 
     # Create directory structure
     if (-not (Test-Path $VMPath)) {
@@ -86,7 +60,8 @@ function Install-InternalMonitor {
         Write-Host "Copying monitor script to VM..." -ForegroundColor Green
         Copy-Item $sourceScript $targetScript -Force
         Write-Host "Monitor script copied to: $targetScript" -ForegroundColor Green
-    } else {
+    }
+    else {
         throw "Source monitor script not found: $sourceScript"
     }
 
@@ -126,7 +101,8 @@ function Install-InternalMonitor {
     try {
         Register-ScheduledTask -TaskName $taskName -Description $taskDescription -Action $action -Trigger @($triggerLogon, $triggerRepeat) -Settings $settings -Principal $principal | Out-Null
         Write-Host "Scheduled task '$taskName' created successfully" -ForegroundColor Green
-    } catch {
+    }
+    catch {
         Write-Host "Failed to create scheduled task: $_" -ForegroundColor Red
         throw "Scheduled task creation failed"
     }
@@ -136,24 +112,26 @@ function Install-InternalMonitor {
     try {
         Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 2
-    } catch { }
+    }
+    catch { }
 
     # Start the task immediately
     Write-Host "Starting hibernation monitor..." -ForegroundColor Green
     try {
         Start-ScheduledTask -TaskName $taskName
         Write-Host "Hibernation monitor started" -ForegroundColor Green
-    } catch {
+    }
+    catch {
         Write-Host "Failed to start task immediately: $_" -ForegroundColor Yellow
         Write-Host "Task will start automatically on next boot" -ForegroundColor Gray
     }
-}
 
-Write-Host "VM Internal Hibernation Monitor installed and started!" -ForegroundColor Green
-Write-Host "  Monitor script: $targetScript" -ForegroundColor Gray
-Write-Host "  Inactivity timeout: $timeoutFromConfig minutes" -ForegroundColor Gray
-Write-Host "  Log file: $monitorLog" -ForegroundColor Gray
-Write-Host "  Scheduled task: $taskName" -ForegroundColor Gray
+    Write-Host "VM Internal Hibernation Monitor installed and started!" -ForegroundColor Green
+    Write-Host "  Monitor script: $targetScript" -ForegroundColor Gray
+    Write-Host "  Inactivity timeout: $timeoutFromConfig minutes" -ForegroundColor Gray
+    Write-Host "  Log file: $monitorLog" -ForegroundColor Gray
+    Write-Host "  Scheduled task: $taskName" -ForegroundColor Gray
+}
 
 function Uninstall-InternalMonitor {
     Write-Host "Uninstalling VM Internal Hibernation Monitor..." -ForegroundColor Yellow
@@ -167,7 +145,8 @@ function Uninstall-InternalMonitor {
         Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
         Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
         Write-Host "Scheduled task removed" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "No scheduled task found to remove" -ForegroundColor Yellow
     }
 
@@ -194,7 +173,8 @@ function Show-Status {
         Write-Host "  Last Run: $($taskInfo.LastRunTime)" -ForegroundColor Gray
         Write-Host "  Next Run: $($taskInfo.NextRunTime)" -ForegroundColor Gray
         Write-Host "  Last Result: $($taskInfo.LastTaskResult)" -ForegroundColor Gray
-    } else {
+    }
+    else {
         Write-Host "Scheduled task not found" -ForegroundColor Red
     }
 
@@ -202,7 +182,8 @@ function Show-Status {
     if (Test-Path $scriptPath) {
         Write-Host "Monitor script: Installed" -ForegroundColor Green
         Write-Host "  Location: $scriptPath" -ForegroundColor Gray
-    } else {
+    }
+    else {
         Write-Host "Monitor script: Not found" -ForegroundColor Red
     }
 
@@ -220,7 +201,8 @@ function Show-Status {
                 Write-Host "    $entry" -ForegroundColor DarkGray
             }
         }
-    } else {
+    }
+    else {
         Write-Host "Log file: Not found" -ForegroundColor Yellow
     }
 }
@@ -230,13 +212,15 @@ Write-Host "===========================================" -ForegroundColor Green
 
 if ($Uninstall) {
     Uninstall-InternalMonitor
-} else {
+}
+else {
     # Check if running inside a VM
     $isVM = $false
     try {
         $model = (Get-CimInstance -ClassName Win32_ComputerSystem).Model
         if ($model -match "Virtual|VMware|VirtualBox|Hyper-V") { $isVM = $true }
-    } catch { $isVM = $false }
+    }
+    catch { $isVM = $false }
 
     if (-not $isVM) {
         Write-Host "Warning: This does not appear to be running inside a VM" -ForegroundColor Yellow

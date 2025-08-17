@@ -28,41 +28,9 @@ if ($config.logging.verboseOutput) {
     Write-Host ""
 }
 
-# Check current Azure context and login if needed
-Write-Host "📋 Checking Azure authentication..." -ForegroundColor Yellow
-$currentAccount = az account show 2>$null | ConvertFrom-Json
-$needsLogin = $false
-
-if (-not $currentAccount) {
-    Write-Host "⚠️ Not logged in to Azure" -ForegroundColor Yellow
-    $needsLogin = $true
-} elseif ($currentAccount.tenantId -ne $TENANT_B) {
-    Write-Host "⚠️ Wrong tenant (current: $($currentAccount.tenantId), required: $TENANT_B)" -ForegroundColor Yellow
-    $needsLogin = $true
-} elseif ($currentAccount.id -ne $SUB_B) {
-    Write-Host "⚠️ Wrong subscription (current: $($currentAccount.id), required: $SUB_B)" -ForegroundColor Yellow
-    # Just set the subscription, no need to re-login
-    az account set --subscription $SUB_B
-    Write-Host "✅ Switched to correct subscription" -ForegroundColor Green
-} else {
-    Write-Host "✅ Already authenticated to correct tenant and subscription" -ForegroundColor Green
-}
-
-if ($needsLogin) {
-    Write-Host "🔐 Logging in to Azure..." -ForegroundColor Yellow
-    az login --tenant $TENANT_B | Out-Null
-    az account set --subscription $SUB_B
-    
-    # Verify context
-    $currentSub = az account show --query "id" -o tsv
-    if ($currentSub -ne $SUB_B) {
-        Write-Error "Failed to set correct subscription context. Expected: $SUB_B, Got: $currentSub"
-        exit 1
-    }
-    Write-Host "✅ Successfully authenticated and set context to subscription: $SUB_B" -ForegroundColor Green
-} else {
-    Write-Host "✅ Using existing authentication context" -ForegroundColor Green
-}
+# Use shared Azure authentication helper
+. (Join-Path $PSScriptRoot "azure-auth-helper.ps1")
+Ensure-AzureCLIAuthenticated -TenantId $TENANT_B -SubscriptionId $SUB_B
 
 # Check VM status and start if needed
 Write-Host "🔍 Checking VM status..." -ForegroundColor Yellow
@@ -72,7 +40,8 @@ $wasHibernated = $false
 if ($powerState -eq "VM deallocated") {
     Write-Host "🛌 VM is hibernated/deallocated" -ForegroundColor Yellow
     $wasHibernated = $true
-} elseif ($powerState -ne "VM running") {
+}
+elseif ($powerState -ne "VM running") {
     Write-Host "⚠️ VM is in state: $powerState" -ForegroundColor Yellow
 }
 
@@ -91,13 +60,14 @@ if ($powerState -ne "VM running") {
     if ($wasHibernated) {
         Write-Host "⏱️ VM was hibernated - waiting $HIBERNATION_RESUME_WAIT seconds for full resume..." -ForegroundColor Yellow
         for ($i = $HIBERNATION_RESUME_WAIT; $i -gt 0; $i--) {
-            Write-Progress -Activity "Waiting for hibernation resume" -Status "$i seconds remaining" -PercentComplete (($HIBERNATION_RESUME_WAIT-$i)/$HIBERNATION_RESUME_WAIT*100)
+            Write-Progress -Activity "Waiting for hibernation resume" -Status "$i seconds remaining" -PercentComplete (($HIBERNATION_RESUME_WAIT - $i) / $HIBERNATION_RESUME_WAIT * 100)
             Start-Sleep -Seconds 1
         }
         Write-Progress -Activity "Waiting for hibernation resume" -Completed
         Write-Host "✅ Hibernation resume wait completed" -ForegroundColor Green
     }
-} else {
+}
+else {
     Write-Host "✅ VM is already running" -ForegroundColor Green
 }
 
