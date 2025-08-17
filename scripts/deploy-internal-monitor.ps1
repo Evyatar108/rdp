@@ -192,7 +192,7 @@ if ($Uninstall) {
     # Check if running inside a VM
     $isVM = (Get-WmiObject -Class Win32_ComputerSystem).Model -match "Virtual|VMware|VirtualBox|Hyper-V"
     if (-not $isVM) {
-        Write-Status "Warning: This doesn't appear to be running inside a VM" "Yellow"
+        Write-Status "Warning: This does not appear to be running inside a VM" "Yellow"
         Write-Status "   Continuing anyway..." "Yellow"
     }
     
