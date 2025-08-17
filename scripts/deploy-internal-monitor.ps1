@@ -24,6 +24,17 @@ if (-not (Test-Administrator)) {
 function Install-InternalMonitor {
     Write-Host "Installing VM Internal Hibernation Monitor..." -ForegroundColor Cyan
 
+    # Load configuration to get the correct timeout
+    try {
+        . (Join-Path $PSScriptRoot "config-loader.ps1")
+        $config = Get-VMRdpConfig
+        $timeoutFromConfig = $config.hibernation.internalMonitor.inactivityTimeoutMinutes
+        Write-Host "Loaded inactivity timeout from config: $timeoutFromConfig minutes" -ForegroundColor Green
+    } catch {
+        Write-Host "Warning: Could not load configuration. Using default timeout of $InactivityTimeoutMinutes minutes." -ForegroundColor Yellow
+        $timeoutFromConfig = $InactivityTimeoutMinutes
+    }
+
     # Create directory structure
     if (-not (Test-Path $VMPath)) {
         Write-Host "Creating directory: $VMPath" -ForegroundColor Green
@@ -47,7 +58,7 @@ function Install-InternalMonitor {
     Write-Host "Creating scheduled task for automatic startup..." -ForegroundColor Green
 
     $taskName = "VMHibernationMonitor"
-    $taskDescription = "Automatically hibernates VM after $InactivityTimeoutMinutes minutes of inactivity"
+    $taskDescription = "Automatically hibernates VM after $timeoutFromConfig minutes of inactivity"
 
     # Remove existing task if it exists
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
@@ -57,7 +68,7 @@ function Install-InternalMonitor {
     }
 
     # Create task action
-    $actionArgs = "-NoProfile -NoLogo -NoExit -ExecutionPolicy Bypass -File `"$targetScript`" -InactivityTimeoutMinutes $InactivityTimeoutMinutes -LogFile `"$monitorLog`""
+    $actionArgs = "-NoProfile -NoLogo -NoExit -ExecutionPolicy Bypass -File `"$targetScript`" -InactivityTimeoutMinutes $timeoutFromConfig -LogFile `"$monitorLog`""
     $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs
 
     # Create task trigger (at startup + delay)
@@ -95,7 +106,7 @@ function Install-InternalMonitor {
 
     Write-Host "VM Internal Hibernation Monitor installed and started!" -ForegroundColor Green
     Write-Host "  Monitor script: $targetScript" -ForegroundColor Gray
-    Write-Host "  Inactivity timeout: $InactivityTimeoutMinutes minutes" -ForegroundColor Gray
+    Write-Host "  Inactivity timeout: $timeoutFromConfig minutes" -ForegroundColor Gray
     Write-Host "  Log file: $monitorLog" -ForegroundColor Gray
     Write-Host "  Scheduled task: $taskName" -ForegroundColor Gray
 }
