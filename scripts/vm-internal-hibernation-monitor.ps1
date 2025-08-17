@@ -22,7 +22,7 @@ function Write-Log {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $logMessage = "[$timestamp] $Message"
     Write-Host $logMessage -ForegroundColor Cyan
-    Add-Content -Path $LogFile -Value $logMessage -ErrorAction SilentlyContinue
+    Add-Content -Path $LogFile -Value $logMessage -ErrorAction SilentlyContinue -Encoding UTF8
 }
 
 function Get-LastInputTime {
@@ -105,7 +105,7 @@ function Invoke-VMHibernation {
 }
 
 # Main monitoring loop
-Write-Log "🔍 VM Internal Hibernation Monitor Started"
+Write-Log "VM Internal Hibernation Monitor Started"
 Write-Log "   Inactivity timeout: $InactivityTimeoutMinutes minutes"
 Write-Log "   Check interval: $CheckIntervalSeconds seconds"
 Write-Log "   Log file: $LogFile"

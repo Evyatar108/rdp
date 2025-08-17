@@ -57,7 +57,7 @@ function Install-InternalMonitor {
     }
 
     # Create task action
-    $actionArgs = "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$targetScript`" -InactivityTimeoutMinutes $InactivityTimeoutMinutes -LogFile `"$monitorLog`""
+    $actionArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$targetScript`" -InactivityTimeoutMinutes $InactivityTimeoutMinutes -LogFile `"$monitorLog`""
     $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs
 
     # Create task trigger (at startup + delay)
