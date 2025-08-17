@@ -15,6 +15,23 @@ try {
     $config = Get-VMRdpConfig
     $verboseOutput = $config.logging.verboseOutput
     $showDetailedErrors = $config.logging.showDetailedErrors
+    
+    # Check if external hibernation monitoring is disabled
+    if (-not $config.hibernation.external.enabled) {
+        Write-Host "External hibernation monitoring is disabled in config.json" -ForegroundColor Yellow
+        Write-Host "Only the internal VM monitor will handle hibernation." -ForegroundColor Cyan
+        Write-Host "VM will remain running until internal monitor triggers hibernation." -ForegroundColor Gray
+        Write-Host ""
+        Write-Host "To re-enable external monitoring, set hibernation.external.enabled to true in config.json" -ForegroundColor Gray
+        
+        if ($isVisible) {
+            Write-Host "Press Enter to close this window..." -ForegroundColor Yellow
+            Read-Host
+        } else {
+            Start-Sleep -Seconds 5
+        }
+        exit 0
+    }
 } catch {
     # Fallback if config loading fails
     $verboseOutput = $true

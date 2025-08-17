@@ -14,6 +14,10 @@
       "hibernationResumeWaitSeconds": 30
     },
     "showMonitorWindow": true,
+    "external": {
+      "enabled": false,
+      "inactivityTimeoutMinutes": 15
+    },
     "internal": {
       "enabled": true,
       "inactivityTimeoutMinutes": 10,

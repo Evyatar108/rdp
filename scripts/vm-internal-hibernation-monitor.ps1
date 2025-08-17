@@ -63,25 +63,51 @@ public struct LASTINPUTINFO
         return 0 # Fail safe: if we can't get idle time, assume the user is active.
     }
 }
-
 function Invoke-VMHibernation {
     try {
-        # First try the direct PowerShell method
-        Stop-Computer -Force -Hibernate -ErrorAction Stop
-    } catch {
-        # Try using shutdown command as a fallback
-        try {
-            & shutdown /h /f
-        } catch {
-            # As a last resort, try using rundll32
+        # Load Azure configuration to get VM details
+        . (Join-Path $PSScriptRoot "config-loader.ps1")
+        $config = Get-VMRdpConfig
+        $resourceGroup = $config.azure.target.resourceGroup
+        $vmName = $config.azure.target.vmName
+        
+        Write-Host "Hibernating VM using Azure CLI..." -ForegroundColor Green
+        Write-Host "Running: az vm deallocate -g $resourceGroup -n $vmName --hibernate true" -ForegroundColor Gray
+        
+        # Use the same Azure CLI command as the external monitor
+        $hibernateOutput = az vm deallocate -g $resourceGroup -n $vmName --hibernate true 2>&1
+        $hibernateExitCode = $LASTEXITCODE
+        
+        if ($hibernateExitCode -eq 0) {
+            Write-Host "VM hibernated successfully!" -ForegroundColor Green
+            return $true
+        } else {
+            Write-Host "Azure hibernation failed with exit code: $hibernateExitCode" -ForegroundColor Red
+            Write-Host "Output: $hibernateOutput" -ForegroundColor Yellow
+            
+            # Fall back to local hibernation methods as backup
+            Write-Host "Attempting local hibernation fallback..." -ForegroundColor Yellow
             try {
-                & rundll32.exe powrprof.dll,SetSuspendState 1,1,0
+                Stop-Computer -Force -Hibernate -ErrorAction Stop
+                return $true
             } catch {
-                return $false
+                try {
+                    & shutdown /h /f
+                    return $true
+                } catch {
+                    try {
+                        & rundll32.exe powrprof.dll,SetSuspendState 1,1,0
+                        return $true
+                    } catch {
+                        return $false
+                    }
+                }
             }
         }
+    } catch {
+        Write-Host "Error during hibernation: $($_.Exception.Message)" -ForegroundColor Red
+        return $false
     }
-    return $true
 }
 
 # Main monitoring loop
