@@ -28,21 +28,51 @@ function Write-Log {
 function Get-LastInputTime {
     # Get last input time using Windows API
     try {
-        $signature = '[DllImport("user32.dll")]public static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);public struct LASTINPUTINFO{public uint cbSize;public uint dwTime;}'
-        $type = Add-Type -MemberDefinition $signature -Name Win32Utils -Namespace GetLastInputTime -PassThru
+        # Try to use existing type first
+        $type = [GetLastInputTime.Win32Utils] -as [type]
+        if (-not $type) {
+            $signature = @'
+[DllImport("user32.dll")]
+public static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
+[StructLayout(LayoutKind.Sequential)]
+public struct LASTINPUTINFO
+{
+    public uint cbSize;
+    public uint dwTime;
+}
+'@
+            $type = Add-Type -MemberDefinition $signature -Name Win32Utils -Namespace GetLastInputTime -PassThru -ErrorAction Stop
+        }
+        
         $lastInputInfo = New-Object GetLastInputTime.Win32Utils+LASTINPUTINFO
         $lastInputInfo.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($lastInputInfo)
         
         if ($type::GetLastInputInfo([ref]$lastInputInfo)) {
             $uptime = [Environment]::TickCount
             $idleTime = $uptime - $lastInputInfo.dwTime
-            return [math]::Round($idleTime / 1000) # Return idle time in seconds
+            return [math]::Max(0, [math]::Round($idleTime / 1000)) # Return idle time in seconds
+        } else {
+            throw "GetLastInputInfo API call failed"
         }
     } catch {
-        Write-Log "Warning: Could not get last input time, using fallback method"
-        return 0
+        Write-Log "Warning: Could not get last input time ($($_.Exception.Message)), using process-based fallback"
+        # Fallback: Use process activity as a proxy for user activity
+        try {
+            $recentProcesses = Get-Process | Where-Object {
+                $_.StartTime -and
+                $_.StartTime -gt (Get-Date).AddMinutes(-5) -and
+                $_.ProcessName -match "chrome|firefox|edge|notepad|winword|excel|powerpnt|code"
+            }
+            if ($recentProcesses) {
+                return 0  # Recent user processes found, consider as recent activity
+            } else {
+                return 300  # No recent user processes, assume 5 minutes idle
+            }
+        } catch {
+            return 0  # If all else fails, assume no idle time
+        }
     }
-    return 0
 }
 
 function Test-UserActivity {
@@ -127,13 +157,22 @@ try {
                 Write-Log "User activity detected, resetting inactivity counter"
                 $consecutiveInactiveChecks = 0
             }
+            # Clear progress bar when activity detected
+            Write-Progress -Activity "VM Hibernation Monitor" -Completed
         } else {
             $consecutiveInactiveChecks++
             $idleMinutes = [math]::Round($idleSeconds / 60, 1)
             Write-Log "No activity detected for $idleMinutes minutes (check $consecutiveInactiveChecks/$requiredInactiveChecks)"
             
+            # Show countdown progress bar
+            $remainingSeconds = $inactivityThresholdSeconds - $idleSeconds
+            $percentComplete = [math]::Min(100, [math]::Round(($idleSeconds / $inactivityThresholdSeconds) * 100, 1))
+            $remainingMinutes = [math]::Round($remainingSeconds / 60, 1)
+            Write-Progress -Activity "VM Hibernation Monitor" -Status "Hibernating in $remainingMinutes minutes ($remainingSeconds seconds remaining)" -PercentComplete $percentComplete
+            
             if ($consecutiveInactiveChecks -ge $requiredInactiveChecks) {
                 Write-Log "Inactivity threshold reached, hibernating VM..."
+                Write-Progress -Activity "VM Hibernation Monitor" -Completed
                 
                 if (Invoke-VMHibernation) {
                     Write-Log "VM hibernation initiated successfully"
@@ -151,5 +190,6 @@ try {
 } catch {
     Write-Log "Monitoring interrupted: $_"
 } finally {
+    Write-Progress -Activity "VM Hibernation Monitor" -Completed
     Write-Log "VM Internal Hibernation Monitor stopped"
 }
