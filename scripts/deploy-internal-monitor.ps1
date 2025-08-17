@@ -28,7 +28,7 @@ function Install-InternalMonitor {
     try {
         . (Join-Path $PSScriptRoot "config-loader.ps1")
         $config = Get-VMRdpConfig
-        $timeoutFromConfig = $config.hibernation.internalMonitor.inactivityTimeoutMinutes
+        $timeoutFromConfig = $config.hibernation.internal.inactivityTimeoutMinutes
         Write-Host "Loaded inactivity timeout from config: $timeoutFromConfig minutes" -ForegroundColor Green
     } catch {
         Write-Host "ERROR: Could not load configuration: $_" -ForegroundColor Red
