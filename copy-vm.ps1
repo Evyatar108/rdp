@@ -171,14 +171,19 @@ if ($containerExists -eq "false" -or -not $containerExists) {
 # Generate WRITE SAS for container (allow create+write) - with caching
 $sasContainerCacheFile = "$cacheDir\container-sas.json"
 $DST_CONTAINER_SAS = $null
+$requiredPermissions = "rwdlac"
 
 if (Test-Path $sasContainerCacheFile) {
     try {
         $cachedSasData = Get-Content $sasContainerCacheFile -Raw | ConvertFrom-Json
         $expiryTime = [DateTime]::ParseExact($cachedSasData.Expiry, "yyyy-MM-ddTHH:mmZ", $null)
-        if ($expiryTime -gt (Get-Date).AddMinutes(10)) {
+        $permissionsMatch = $cachedSasData.Permissions -eq $requiredPermissions
+        
+        if ($expiryTime -gt (Get-Date).AddMinutes(10) -and $permissionsMatch) {
             $DST_CONTAINER_SAS = $cachedSasData.SasUrl
-            Write-Host "Using cached container SAS token (expires: $($cachedSasData.Expiry))"
+            Write-Host "Using cached container SAS token (expires: $($cachedSasData.Expiry), permissions: $($cachedSasData.Permissions))"
+        } elseif (-not $permissionsMatch) {
+            Write-Host "Cached container SAS token has different permissions ($($cachedSasData.Permissions) vs $requiredPermissions), will generate new one"
         } else {
             Write-Host "Cached container SAS token expired, will generate new one"
         }
@@ -188,15 +193,16 @@ if (Test-Path $sasContainerCacheFile) {
 }
 
 if (-not $DST_CONTAINER_SAS) {
-    Write-Host "Generating new container SAS token..."
+    Write-Host "Generating new container SAS token with permissions: $requiredPermissions..."
     $DST_CONTAINER_SAS = az storage container generate-sas `
       --account-name $SA_B --name $CONTAINER `
-      --permissions cw --expiry $EXPIRY_DST -o tsv
+      --permissions $requiredPermissions --expiry $EXPIRY_DST -o tsv
     
-    # Cache the SAS token
+    # Cache the SAS token with permissions info
     $sasCache = @{
         SasUrl = $DST_CONTAINER_SAS
         Expiry = $EXPIRY_DST
+        Permissions = $requiredPermissions
         Generated = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
         StorageAccount = $SA_B
         Container = $CONTAINER
@@ -206,17 +212,29 @@ if (-not $DST_CONTAINER_SAS) {
 }
 
 # Destinations (container SAS goes at the end)
-$DST_OS = "https://$SA_B.blob.core.windows.net/$CONTAINER/$OS_VHD?$DST_CONTAINER_SAS"
-$DST_DATA0 = "https://$SA_B.blob.core.windows.net/$CONTAINER/$DATA0_VHD?$DST_CONTAINER_SAS"
+$DST_OS = "https://$SA_B.blob.core.windows.net/$CONTAINER/$OS_VHD`?$DST_CONTAINER_SAS"
+$DST_DATA0 = "https://$SA_B.blob.core.windows.net/$CONTAINER/$DATA0_VHD`?$DST_CONTAINER_SAS"
 
 
-# If you haven't already:
-#   azcopy login    # optional; using SAS on both ends means login isn't required.
+# For cross-tenant copy, remove automatic authentication and rely on SAS tokens
+if ($env:AZCOPY_AUTO_LOGIN_TYPE) {
+    Remove-Item Env:AZCOPY_AUTO_LOGIN_TYPE
+}
+if ($env:AZCOPY_TENANT_ID) {
+    Remove-Item Env:AZCOPY_TENANT_ID
+}
+Write-Host "Configured AzCopy to use SAS-only authentication for cross-tenant copy"
 
 # Copy OS VHD
+Write-Host "Starting OS disk copy..."
+Write-Host "Source (Tenant A): $($SRC_OS_SAS.Substring(0, 50))..."
+Write-Host "Destination (Tenant B): $($DST_OS.Substring(0, 50))..."
 azcopy copy $SRC_OS_SAS $DST_OS --recursive=false
 
 # Copy Data VHD
+Write-Host "Starting data disk copy..."
+Write-Host "Source (Tenant A): $($SRC_DATA0_SAS.Substring(0, 50))..."
+Write-Host "Destination (Tenant B): $($DST_DATA0.Substring(0, 50))..."
 azcopy copy $SRC_DATA0_SAS $DST_DATA0 --recursive=false
 
 # OS managed disk
