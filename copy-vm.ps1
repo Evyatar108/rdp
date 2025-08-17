@@ -225,17 +225,27 @@ if ($env:AZCOPY_TENANT_ID) {
 }
 Write-Host "Configured AzCopy to use SAS-only authentication for cross-tenant copy"
 
-# Copy OS VHD
-Write-Host "Starting OS disk copy..."
-Write-Host "Source (Tenant A): $($SRC_OS_SAS.Substring(0, 50))..."
-Write-Host "Destination (Tenant B): $($DST_OS.Substring(0, 50))..."
-azcopy copy $SRC_OS_SAS $DST_OS --recursive=false
+# Copy OS VHD (only if not already exists)
+$osVhdExists = az storage blob exists --account-name $SA_B --container-name $CONTAINER --name $OS_VHD --query "exists" -o tsv 2>$null
+if ($osVhdExists -eq "true") {
+    Write-Host "OS VHD '$OS_VHD' already exists in destination, skipping copy."
+} else {
+    Write-Host "Starting OS disk copy..."
+    Write-Host "Source (Tenant A): $($SRC_OS_SAS.Substring(0, 50))..."
+    Write-Host "Destination (Tenant B): $($DST_OS.Substring(0, 50))..."
+    azcopy copy $SRC_OS_SAS $DST_OS --recursive=false
+}
 
-# Copy Data VHD
-Write-Host "Starting data disk copy..."
-Write-Host "Source (Tenant A): $($SRC_DATA0_SAS.Substring(0, 50))..."
-Write-Host "Destination (Tenant B): $($DST_DATA0.Substring(0, 50))..."
-azcopy copy $SRC_DATA0_SAS $DST_DATA0 --recursive=false
+# Copy Data VHD (only if not already exists)
+$dataVhdExists = az storage blob exists --account-name $SA_B --container-name $CONTAINER --name $DATA0_VHD --query "exists" -o tsv 2>$null
+if ($dataVhdExists -eq "true") {
+    Write-Host "Data VHD '$DATA0_VHD' already exists in destination, skipping copy."
+} else {
+    Write-Host "Starting data disk copy..."
+    Write-Host "Source (Tenant A): $($SRC_DATA0_SAS.Substring(0, 50))..."
+    Write-Host "Destination (Tenant B): $($DST_DATA0.Substring(0, 50))..."
+    azcopy copy $SRC_DATA0_SAS $DST_DATA0 --recursive=false
+}
 
 # OS managed disk
 $osDiskExists = az disk show -g $RG_B -n "DesktopVM-OS-Managed" --query "name" -o tsv 2>$null
