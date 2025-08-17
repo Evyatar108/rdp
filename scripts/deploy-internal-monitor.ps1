@@ -33,6 +33,7 @@ function Install-InternalMonitor {
     # Copy the monitor script
     $sourceScript = Join-Path $PSScriptRoot "vm-internal-hibernation-monitor.ps1"
     $targetScript = Join-Path $VMPath "vm-internal-hibernation-monitor.ps1"
+    $monitorLog = Join-Path $VMPath "hibernation-monitor.log"
 
     if (Test-Path $sourceScript) {
         Write-Host "Copying monitor script to VM..." -ForegroundColor Green
@@ -56,7 +57,7 @@ function Install-InternalMonitor {
     }
 
     # Create task action
-    $actionArgs = "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$targetScript`" -InactivityTimeoutMinutes $InactivityTimeoutMinutes"
+    $actionArgs = "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$targetScript`" -InactivityTimeoutMinutes $InactivityTimeoutMinutes -LogFile `"$monitorLog`""
     $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs
 
     # Create task trigger (at startup + delay)
@@ -93,7 +94,7 @@ function Install-InternalMonitor {
     Write-Host "VM Internal Hibernation Monitor installed and started!" -ForegroundColor Green
     Write-Host "  Monitor script: $targetScript" -ForegroundColor Gray
     Write-Host "  Inactivity timeout: $InactivityTimeoutMinutes minutes" -ForegroundColor Gray
-    Write-Host "  Log file: $env:TEMP\hibernation-monitor.log" -ForegroundColor Gray
+    Write-Host "  Log file: $monitorLog" -ForegroundColor Gray
     Write-Host "  Scheduled task: $taskName" -ForegroundColor Gray
 }
 
@@ -148,7 +149,7 @@ function Show-Status {
         Write-Host "Monitor script: Not found" -ForegroundColor Red
     }
 
-    $logPath = "$env:TEMP\hibernation-monitor.log"
+    $logPath = (Join-Path $VMPath "hibernation-monitor.log")
     if (Test-Path $logPath) {
         $logSize = (Get-Item $logPath).Length
         Write-Host "Log file: $logSize bytes" -ForegroundColor Green
@@ -195,4 +196,4 @@ Write-Host "Usage Tips:" -ForegroundColor Yellow
 Write-Host "  - To check status: .\deploy-internal-monitor.ps1" -ForegroundColor Gray
 Write-Host "  - To uninstall: .\deploy-internal-monitor.ps1 -Uninstall" -ForegroundColor Gray
 Write-Host "  - To change timeout: .\deploy-internal-monitor.ps1 -InactivityTimeoutMinutes 15" -ForegroundColor Gray
-Write-Host "  - View logs: Get-Content $env:TEMP\hibernation-monitor.log" -ForegroundColor Gray
+Write-Host "  - View logs: Get-Content C:\VMHibernation\hibernation-monitor.log" -ForegroundColor Gray

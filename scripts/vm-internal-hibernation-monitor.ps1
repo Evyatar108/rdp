@@ -5,10 +5,17 @@
 param(
     [int]$InactivityTimeoutMinutes = 10,
     [int]$CheckIntervalSeconds = 60,
-    [string]$LogFile = "$env:TEMP\hibernation-monitor.log"
+    [string]$LogFile = "C:\VMHibernation\hibernation-monitor.log"
 )
 
 $ErrorActionPreference = 'Continue'
+# Ensure log directory exists
+try {
+    $logDir = Split-Path -Parent $LogFile
+    if ($logDir -and -not (Test-Path $logDir)) {
+        New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+    }
+} catch { }
 
 function Write-Log {
     param([string]$Message)
