@@ -9,11 +9,16 @@
   },
   "hibernation": {
     "timing": {
-      "delayAfterRdpCloseSeconds": 10,
+      "delayAfterRdpCloseSeconds": 120,
       "progressUpdateIntervalSeconds": 1,
       "hibernationResumeWaitSeconds": 30
     },
-    "showMonitorWindow": false
+    "showMonitorWindow": true,
+    "internal": {
+      "enabled": true,
+      "inactivityTimeoutMinutes": 10,
+      "checkIntervalSeconds": 60
+    }
   },
   "autoUpdate": {
     "enabled": true,

@@ -75,7 +75,12 @@ All settings are managed through a single JSON configuration file: **[`config.js
       "progressUpdateIntervalSeconds": 1,
       "hibernationResumeWaitSeconds": 30
     },
-    "showMonitorWindow": true
+    "showMonitorWindow": true,
+    "internal": {
+      "enabled": true,
+      "inactivityTimeoutMinutes": 10,
+      "checkIntervalSeconds": 60
+    }
   }
 }
 ```
