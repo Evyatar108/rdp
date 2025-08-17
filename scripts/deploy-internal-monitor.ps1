@@ -31,8 +31,9 @@ function Install-InternalMonitor {
         $timeoutFromConfig = $config.hibernation.internalMonitor.inactivityTimeoutMinutes
         Write-Host "Loaded inactivity timeout from config: $timeoutFromConfig minutes" -ForegroundColor Green
     } catch {
-        Write-Host "Warning: Could not load configuration. Using default timeout of $InactivityTimeoutMinutes minutes." -ForegroundColor Yellow
-        $timeoutFromConfig = $InactivityTimeoutMinutes
+        Write-Host "ERROR: Could not load configuration: $_" -ForegroundColor Red
+        Write-Host "The internal monitor requires a valid config.json file." -ForegroundColor Red
+        throw "Configuration loading failed"
     }
 
     # Create directory structure
@@ -69,6 +70,7 @@ function Install-InternalMonitor {
 
     # Create task action
     $actionArgs = "-NoProfile -NoLogo -NoExit -ExecutionPolicy Bypass -File `"$targetScript`" -InactivityTimeoutMinutes $timeoutFromConfig -LogFile `"$monitorLog`""
+    Write-Host "Task arguments: $actionArgs" -ForegroundColor Gray
     $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs
 
     # Create task trigger (at startup + delay)
@@ -93,15 +95,22 @@ function Install-InternalMonitor {
         Write-Host "Failed to create scheduled task: $_" -ForegroundColor Red
         throw "Scheduled task creation failed"
     }
+# Stop any existing running instances first
+Write-Host "Stopping any existing monitor instances..." -ForegroundColor Yellow
+try {
+    Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+} catch { }
 
-    # Start the task immediately
-    Write-Host "Starting hibernation monitor..." -ForegroundColor Green
-    try {
-        Start-ScheduledTask -TaskName $taskName
-        Write-Host "Hibernation monitor started" -ForegroundColor Green
-    } catch {
-        Write-Host "Failed to start task immediately: $_" -ForegroundColor Yellow
-        Write-Host "Task will start automatically on next boot" -ForegroundColor Gray
+# Start the task immediately
+Write-Host "Starting hibernation monitor..." -ForegroundColor Green
+try {
+    Start-ScheduledTask -TaskName $taskName
+    Write-Host "Hibernation monitor started" -ForegroundColor Green
+} catch {
+    Write-Host "Failed to start task immediately: $_" -ForegroundColor Yellow
+    Write-Host "Task will start automatically on next boot" -ForegroundColor Gray
+}
     }
 
     Write-Host "VM Internal Hibernation Monitor installed and started!" -ForegroundColor Green
