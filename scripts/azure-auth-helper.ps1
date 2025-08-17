@@ -51,15 +51,18 @@ function Ensure-AzureCLIAuthenticated {
     if (-not $currentAccount) {
         if (-not $Quiet) { Write-Host "⚠️ Not logged in to Azure" -ForegroundColor Yellow }
         $needsLogin = $true
-    } elseif ($currentAccount.tenantId -ne $TenantId) {
+    }
+    elseif ($currentAccount.tenantId -ne $TenantId) {
         if (-not $Quiet) { Write-Host "⚠️ Wrong tenant (current: $($currentAccount.tenantId), required: $TenantId)" -ForegroundColor Yellow }
         $needsLogin = $true
-    } elseif ($currentAccount.id -ne $SubscriptionId) {
+    }
+    elseif ($currentAccount.id -ne $SubscriptionId) {
         if (-not $Quiet) { Write-Host "⚠️ Wrong subscription (current: $($currentAccount.id), required: $SubscriptionId)" -ForegroundColor Yellow }
         # Just set the subscription, no need to re-login
         az account set --subscription $SubscriptionId
         if (-not $Quiet) { Write-Host "✅ Switched to correct subscription" -ForegroundColor Green }
-    } else {
+    }
+    else {
         if (-not $Quiet) { Write-Host "✅ Already authenticated to correct tenant and subscription" -ForegroundColor Green }
     }
 
@@ -74,7 +77,8 @@ function Ensure-AzureCLIAuthenticated {
             throw "Failed to set correct subscription context. Expected: $SubscriptionId, Got: $currentSub"
         }
         if (-not $Quiet) { Write-Host "✅ Successfully authenticated and set context to subscription: $SubscriptionId" -ForegroundColor Green }
-    } else {
+    }
+    else {
         if (-not $Quiet) { Write-Host "✅ Using existing authentication context" -ForegroundColor Green }
     }
 }
