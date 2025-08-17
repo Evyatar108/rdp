@@ -54,18 +54,32 @@ function Ensure-AzureCLIAuthenticated {
         [switch]$Quiet
     )
 
-    $currentAccount = az account show 2>$null | ConvertFrom-Json
+    # Check current authentication status
+    $currentAccount = $null
     $needsLogin = $false
+    
+    try {
+        $accountOutput = az account show 2>$null
+        if ($accountOutput -and $accountOutput -ne "" -and $LASTEXITCODE -eq 0) {
+            $currentAccount = $accountOutput | ConvertFrom-Json
+        }
+    } catch {
+        # Ignore errors - will trigger login
+    }
 
     if (-not $currentAccount) {
+        if (-not $Quiet) { Write-Host "No Azure CLI authentication found - need to login" -ForegroundColor Yellow }
         $needsLogin = $true
     } elseif ($currentAccount.tenantId -ne $TenantId) {
+        if (-not $Quiet) { Write-Host "Current tenant ($($currentAccount.tenantId)) differs from target ($TenantId) - need to login" -ForegroundColor Yellow }
         $needsLogin = $true
     } elseif ($currentAccount.id -ne $SubscriptionId) {
+        if (-not $Quiet) { Write-Host "Setting subscription context to: $SubscriptionId" -ForegroundColor Cyan }
         az account set --subscription $SubscriptionId
     }
 
     if ($needsLogin) {
+        if (-not $Quiet) { Write-Host "Logging into Azure tenant: $TenantId" -ForegroundColor Yellow }
         az login --tenant $TenantId | Out-Null
         az account set --subscription $SubscriptionId
         
@@ -73,5 +87,6 @@ function Ensure-AzureCLIAuthenticated {
         if ($currentSub -ne $SubscriptionId) {
             throw "Failed to set correct subscription context"
         }
+        if (-not $Quiet) { Write-Host "Successfully authenticated and set subscription context" -ForegroundColor Green }
     }
 }

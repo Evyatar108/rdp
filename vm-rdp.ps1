@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "🚀 VM RDP Launcher" -ForegroundColor Green
+Write-Host " VM RDP Launcher" -ForegroundColor Green
 Write-Host "==================" -ForegroundColor Green
 
 # Get script paths
@@ -16,18 +16,18 @@ if (Test-Path $updateScript) {
     $scriptsUpdated = & $updateScript
     Write-Host "" # Empty line for spacing
 } else {
-    Write-Host "⚠️ Update script not found - continuing with current scripts" -ForegroundColor Yellow
+    Write-Host " Update script not found - continuing with current scripts" -ForegroundColor Yellow
     Write-Host "" # Empty line for spacing
 }
 
 # Launch the actual connect script
 if (-not (Test-Path $connectScript)) {
     Write-Error "Connect script not found at: $connectScript"
-    Write-Host "💡 Ensure scripts\connect-vm-rdp.ps1 exists" -ForegroundColor Yellow
+    Write-Host " Ensure scripts\connect-vm-rdp.ps1 exists" -ForegroundColor Yellow
     exit 1
 }
 
-Write-Host "🖥️ Launching RDP connection script..." -ForegroundColor Cyan
+Write-Host " Launching RDP connection script..." -ForegroundColor Cyan
 Write-Host "Script: $connectScript" -ForegroundColor Gray
 
 # Execute the connect script
