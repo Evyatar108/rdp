@@ -57,24 +57,29 @@ function Install-InternalMonitor {
     }
 
     # Create task action
-    $actionArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$targetScript`" -InactivityTimeoutMinutes $InactivityTimeoutMinutes -LogFile `"$monitorLog`""
+    $actionArgs = "-NoProfile -NoLogo -NoExit -ExecutionPolicy Bypass -File `"$targetScript`" -InactivityTimeoutMinutes $InactivityTimeoutMinutes -LogFile `"$monitorLog`""
     $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs
 
     # Create task trigger (at startup + delay)
-    $trigger = New-ScheduledTaskTrigger -AtStartup
-    $trigger.Delay = "PT2M"  # 2 minute delay after startup
+    $triggerLogon = New-ScheduledTaskTrigger -AtLogOn
+    # Periodic repetition so Task Scheduler relaunches the monitor shortly if closed
+    $triggerRepeat = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1)
+    $triggerRepeat.Repetition.Interval = 'PT1M'    # every 1 minute
+    $triggerRepeat.Repetition.Duration = 'P9999D'  # effectively indefinitely
 
     # Create task settings
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RunOnlyIfNetworkAvailable:$false
-    $settings.RestartInterval = "PT1M"  # Restart every 1 minute if it fails
-    $settings.RestartCount = 999        # Keep retrying
+    $settings.ExecutionTimeLimit = "PT0S"   # No time limit; run indefinitely
+    $settings.RestartInterval = "PT30S"     # Restart every 30s if it ends unexpectedly
+    $settings.RestartCount = 999            # Keep retrying
+    $settings.MultipleInstances = "IgnoreNew"  # Prevent duplicate instances
 
-    # Create task principal (run as SYSTEM for reliability)
-    $principal = New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+    # Create task principal (run in interactive user session so window is visible)
+    $principal = New-ScheduledTaskPrincipal -UserId "$env:UserDomain\$env:UserName" -LogonType InteractiveToken -RunLevel Highest
 
     # Register the task
     try {
-        Register-ScheduledTask -TaskName $taskName -Description $taskDescription -Action $action -Trigger $trigger -Settings $settings -Principal $principal | Out-Null
+        Register-ScheduledTask -TaskName $taskName -Description $taskDescription -Action $action -Trigger @($triggerLogon, $triggerRepeat) -Settings $settings -Principal $principal | Out-Null
         Write-Host "Scheduled task '$taskName' created successfully" -ForegroundColor Green
     } catch {
         Write-Host "Failed to create scheduled task: $_" -ForegroundColor Red
