@@ -73,7 +73,7 @@ function Install-InternalMonitor {
     $settings.MultipleInstances = "IgnoreNew"  # Prevent duplicate instances
 
     # Create task principal (run in interactive user session so window is visible)
-    $principal = New-ScheduledTaskPrincipal -UserId "$env:UserDomain\$env:UserName" -LogonType InteractiveToken -RunLevel Highest
+    $principal = New-ScheduledTaskPrincipal -UserId "$env:UserDomain\$env:UserName" -LogonType Interactive -RunLevel Highest
 
     # Register the task
     try {
