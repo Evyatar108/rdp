@@ -130,28 +130,30 @@ try {
         $idleMinutes = [math]::Round($idleSeconds / 60, 2)
         Write-Log "System idle for $idleMinutes minutes."
 
+        # Always show progress
+        $remainingSeconds = $inactivityThresholdSeconds - $idleSeconds
+        $percentComplete = [math]::Min(100, [math]::Round(($idleSeconds / $inactivityThresholdSeconds) * 100, 1))
+        $remainingMinutes = [math]::Round($remainingSeconds / 60, 1)
+        $statusMessage = "Hibernating in $remainingMinutes minutes if idle."
+        if ($idleSeconds -gt 0) {
+            $statusMessage = "Hibernating in $remainingMinutes minutes. Idle for $idleMinutes minutes."
+        }
+        Write-Progress -Activity "VM Auto-Hibernation Monitor" -Status $statusMessage -PercentComplete $percentComplete
+
         if ($idleSeconds -lt $inactivityThresholdSeconds) {
             # Activity detected, reset counter
             if ($consecutiveInactiveChecks -gt 0) {
-                Write-Log "Inactivity counter reset."
+                Write-Log "Activity detected. Resetting hibernation counter."
                 $consecutiveInactiveChecks = 0
             }
-            # Clear progress bar when activity is detected
-            try { Write-Progress -Activity "VM Hibernation Monitor" -Completed -ErrorAction SilentlyContinue } catch {}
         } else {
-            # No activity, increment counter and update progress
+            # Inactivity threshold met, increment counter
             $consecutiveInactiveChecks++
             Write-Log "Inactivity threshold met. Hibernation check $consecutiveInactiveChecks/$requiredInactiveChecks."
             
-            # Show countdown progress bar
-            $remainingSeconds = $inactivityThresholdSeconds - $idleSeconds
-            $percentComplete = [math]::Min(100, [math]::Round(($idleSeconds / $inactivityThresholdSeconds) * 100, 1))
-            $remainingMinutes = [math]::Round($remainingSeconds / 60, 1)
-            Write-Progress -Activity "VM Hibernation Monitor" -Status "Hibernating in $remainingMinutes minutes ($remainingSeconds seconds remaining)" -PercentComplete $percentComplete
-            
             if ($consecutiveInactiveChecks -ge $requiredInactiveChecks) {
                 Write-Log "Hibernation threshold reached. Initiating hibernation..."
-                try { Write-Progress -Activity "VM Hibernation Monitor" -Completed -ErrorAction SilentlyContinue } catch {}
+                try { Write-Progress -Activity "VM Auto-Hibernation Monitor" -Completed -ErrorAction SilentlyContinue } catch {}
                 
                 if (Invoke-VMHibernation) {
                     Write-Log "VM hibernation initiated successfully."
