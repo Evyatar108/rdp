@@ -19,12 +19,10 @@ function Test-Administrator {
 if (-not (Test-Administrator)) {
     Write-Host "❌ This script requires Administrator privileges to create scheduled tasks" -ForegroundColor Red
     Write-Host "💡 Please run PowerShell as Administrator and try again" -ForegroundColor Yellow
-    Write-Host ""
     Write-Host "🔧 To run as Administrator:" -ForegroundColor Cyan
     Write-Host "   1. Right-click on PowerShell" -ForegroundColor Gray
     Write-Host "   2. Select 'Run as Administrator'" -ForegroundColor Gray
     Write-Host "   3. Navigate to this directory and run the script again" -ForegroundColor Gray
-    Write-Host ""
     Write-Host "🛡️ If you get execution policy errors, run this first:" -ForegroundColor Yellow
     Write-Host "   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser" -ForegroundColor Gray
     Write-Host "   Or run: powershell -ExecutionPolicy Bypass -File .\scripts\deploy-internal-monitor.ps1" -ForegroundColor Gray
@@ -195,3 +193,4 @@ if ($Uninstall) {
     Start-Sleep -Seconds 2
     Show-Status
 }
+
