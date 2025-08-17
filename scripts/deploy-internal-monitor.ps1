@@ -63,7 +63,7 @@ function Install-InternalMonitor {
     # Create task trigger (at startup + delay)
     $triggerLogon = New-ScheduledTaskTrigger -AtLogOn
     # Periodic repetition so Task Scheduler relaunches the monitor shortly if closed
-    $triggerRepeat = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration ([TimeSpan]::FromDays(36500))
+    $triggerRepeat = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration (New-TimeSpan -Days 365)
 
     # Create task settings
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RunOnlyIfNetworkAvailable:$false
