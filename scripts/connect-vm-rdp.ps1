@@ -89,42 +89,49 @@ $rdpProcess = Start-Process "mstsc" -ArgumentList "/v:$publicIP" -WindowStyle No
 Write-Host "✅ RDP connection launched!" -ForegroundColor Green
 Write-Host "🔐 Enter your credentials when prompted" -ForegroundColor Yellow
 
-# Start hibernation monitoring in separate window immediately after RDP launches
-Write-Host "`n🛌 Starting hibernation monitor in separate window..." -ForegroundColor Cyan
-$delayMinutes = [math]::Round($HIBERNATION_DELAY_SECONDS / 60, 1)
-Write-Host "   VM will hibernate $delayMinutes minutes after RDP window closes" -ForegroundColor Yellow
+# Check if external hibernation monitoring is enabled
+if ($config.hibernation.external.enabled) {
+    # Start hibernation monitoring in separate window immediately after RDP launches
+    Write-Host "`n🛌 Starting hibernation monitor in separate window..." -ForegroundColor Cyan
+    $delayMinutes = [math]::Round($HIBERNATION_DELAY_SECONDS / 60, 1)
+    Write-Host "   VM will hibernate $delayMinutes minutes after RDP window closes" -ForegroundColor Yellow
 
-# Get the directory where this script is located (scripts folder)
-$scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
-$hibernationMonitorScript = Join-Path $scriptDirectory "hibernation-monitor.ps1"
+    # Get the directory where this script is located (scripts folder)
+    $scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $hibernationMonitorScript = Join-Path $scriptDirectory "hibernation-monitor.ps1"
 
-# Verify the hibernation monitor script exists
-if (-not (Test-Path $hibernationMonitorScript)) {
-    Write-Error "Hibernation monitor script not found at: $hibernationMonitorScript"
-    Write-Host "💡 Ensure hibernation-monitor.ps1 is in the same directory as this script" -ForegroundColor Yellow
-    exit 1
-}
+    # Verify the hibernation monitor script exists
+    if (-not (Test-Path $hibernationMonitorScript)) {
+        Write-Error "Hibernation monitor script not found at: $hibernationMonitorScript"
+        Write-Host "💡 Ensure hibernation-monitor.ps1 is in the same directory as this script" -ForegroundColor Yellow
+        exit 1
+    }
 
-# Start monitoring in separate PowerShell window with configurable visibility
-$visibleParam = if ($MONITOR_WINDOW_VISIBLE) { "true" } else { "false" }
-$monitorArguments = @(
-    "-ExecutionPolicy Bypass"
-    "-File `"$hibernationMonitorScript`""
-    "-RG_B `"$RG_B`""
-    "-VM_NAME `"$VM_NAME`""
-    "-HIBERNATION_DELAY_SECONDS $HIBERNATION_DELAY_SECONDS"
-    "-PROGRESS_UPDATE_INTERVAL $PROGRESS_UPDATE_INTERVAL"
-    "-rdpProcessId $($rdpProcess.Id)"
-    "-Visible $visibleParam"
-)
+    # Start monitoring in separate PowerShell window with configurable visibility
+    $visibleParam = if ($MONITOR_WINDOW_VISIBLE) { "true" } else { "false" }
+    $monitorArguments = @(
+        "-ExecutionPolicy Bypass"
+        "-File `"$hibernationMonitorScript`""
+        "-RG_B `"$RG_B`""
+        "-VM_NAME `"$VM_NAME`""
+        "-HIBERNATION_DELAY_SECONDS $HIBERNATION_DELAY_SECONDS"
+        "-PROGRESS_UPDATE_INTERVAL $PROGRESS_UPDATE_INTERVAL"
+        "-rdpProcessId $($rdpProcess.Id)"
+        "-Visible $visibleParam"
+    )
 
-$windowStyle = if ($MONITOR_WINDOW_VISIBLE) { "Normal" } else { "Hidden" }
-$monitorProcess = Start-Process "powershell.exe" -ArgumentList $monitorArguments -WindowStyle $windowStyle -PassThru
+    $windowStyle = if ($MONITOR_WINDOW_VISIBLE) { "Normal" } else { "Hidden" }
+    $monitorProcess = Start-Process "powershell.exe" -ArgumentList $monitorArguments -WindowStyle $windowStyle -PassThru
 
-$visibilityText = if ($MONITOR_WINDOW_VISIBLE) { "visible" } else { "hidden" }
-Write-Host "✅ Hibernation monitor started in $visibilityText window (PID: $($monitorProcess.Id))" -ForegroundColor Green
-Write-Host "💡 This window can now be closed safely - monitoring continues independently" -ForegroundColor Cyan
-Write-Host "🔧 Monitor script: hibernation-monitor.ps1" -ForegroundColor Gray
-if ($MONITOR_WINDOW_VISIBLE) {
-    Write-Host "🐛 Monitor window is visible for debugging - set `$MONITOR_WINDOW_VISIBLE = `$false to hide" -ForegroundColor Yellow
+    $visibilityText = if ($MONITOR_WINDOW_VISIBLE) { "visible" } else { "hidden" }
+    Write-Host "✅ Hibernation monitor started in $visibilityText window (PID: $($monitorProcess.Id))" -ForegroundColor Green
+    Write-Host "💡 This window can now be closed safely - monitoring continues independently" -ForegroundColor Cyan
+    Write-Host "🔧 Monitor script: hibernation-monitor.ps1" -ForegroundColor Gray
+    if ($MONITOR_WINDOW_VISIBLE) {
+        Write-Host "🐛 Monitor window is visible for debugging - set `$MONITOR_WINDOW_VISIBLE = `$false to hide" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "`n🚫 External hibernation monitoring is disabled" -ForegroundColor Yellow
+    Write-Host "   Only the internal VM monitor will handle hibernation" -ForegroundColor Cyan
+    Write-Host "   To enable external monitoring, set hibernation.external.enabled to true in config.json" -ForegroundColor Gray
 }
