@@ -104,9 +104,9 @@ try {
 
         if ($idleSeconds -ge $inactivityThresholdSeconds) {
             try { Write-Progress -Activity "VM Auto-Hibernation Monitor" -Completed -ErrorAction SilentlyContinue } catch {}
-            if (Invoke-VMHibernation) {
-                break # Exit loop on successful hibernation
-            }
+            Invoke-VMHibernation
+            # Let hibernation process run naturally - do not exit the script
+            # The system will shut down when hibernation completes
         }
         
         Start-Sleep -Seconds $CheckIntervalSeconds

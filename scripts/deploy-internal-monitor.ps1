@@ -95,29 +95,30 @@ function Install-InternalMonitor {
         Write-Host "Failed to create scheduled task: $_" -ForegroundColor Red
         throw "Scheduled task creation failed"
     }
-# Stop any existing running instances first
-Write-Host "Stopping any existing monitor instances..." -ForegroundColor Yellow
-try {
-    Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 2
-} catch { }
 
-# Start the task immediately
-Write-Host "Starting hibernation monitor..." -ForegroundColor Green
-try {
-    Start-ScheduledTask -TaskName $taskName
-    Write-Host "Hibernation monitor started" -ForegroundColor Green
-} catch {
-    Write-Host "Failed to start task immediately: $_" -ForegroundColor Yellow
-    Write-Host "Task will start automatically on next boot" -ForegroundColor Gray
-}
+    # Stop any existing running instances first
+    Write-Host "Stopping any existing monitor instances..." -ForegroundColor Yellow
+    try {
+        Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+    } catch { }
+
+    # Start the task immediately
+    Write-Host "Starting hibernation monitor..." -ForegroundColor Green
+    try {
+        Start-ScheduledTask -TaskName $taskName
+        Write-Host "Hibernation monitor started" -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to start task immediately: $_" -ForegroundColor Yellow
+        Write-Host "Task will start automatically on next boot" -ForegroundColor Gray
     }
+}
 
-    Write-Host "VM Internal Hibernation Monitor installed and started!" -ForegroundColor Green
-    Write-Host "  Monitor script: $targetScript" -ForegroundColor Gray
-    Write-Host "  Inactivity timeout: $timeoutFromConfig minutes" -ForegroundColor Gray
-    Write-Host "  Log file: $monitorLog" -ForegroundColor Gray
-    Write-Host "  Scheduled task: $taskName" -ForegroundColor Gray
+Write-Host "VM Internal Hibernation Monitor installed and started!" -ForegroundColor Green
+Write-Host "  Monitor script: $targetScript" -ForegroundColor Gray
+Write-Host "  Inactivity timeout: $timeoutFromConfig minutes" -ForegroundColor Gray
+Write-Host "  Log file: $monitorLog" -ForegroundColor Gray
+Write-Host "  Scheduled task: $taskName" -ForegroundColor Gray
 
 function Uninstall-InternalMonitor {
     Write-Host "Uninstalling VM Internal Hibernation Monitor..." -ForegroundColor Yellow
