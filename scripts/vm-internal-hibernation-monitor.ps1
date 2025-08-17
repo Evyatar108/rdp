@@ -9,21 +9,6 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
-# Ensure log directory exists
-try {
-    $logDir = Split-Path -Parent $LogFile
-    if ($logDir -and -not (Test-Path $logDir)) {
-        New-Item -Path $logDir -ItemType Directory -Force | Out-Null
-    }
-} catch { }
-
-function Write-Log {
-    param([string]$Message)
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $logMessage = "[$timestamp] $Message"
-    Write-Host $logMessage -ForegroundColor Cyan
-    Add-Content -Path $LogFile -Value $logMessage -ErrorAction SilentlyContinue -Encoding UTF8
-}
 
 function Get-SystemIdleTimeSeconds {
     <#
@@ -79,98 +64,54 @@ public struct LASTINPUTINFO
 }
 
 function Invoke-VMHibernation {
-    Write-Log "Initiating VM hibernation due to inactivity..."
-    
     try {
         # First try the direct PowerShell method
-        Write-Log "Attempting hibernation via PowerShell..."
         Stop-Computer -Force -Hibernate -ErrorAction Stop
-        
     } catch {
-        Write-Log "PowerShell hibernation failed, trying alternative method..."
-        
+        # Try using shutdown command as a fallback
         try {
-            # Try using shutdown command
             & shutdown /h /f
-            Write-Log "Hibernation command executed successfully"
-            
         } catch {
-            Write-Log "ERROR: Failed to hibernate VM - $_"
-            
             # As a last resort, try using rundll32
             try {
                 & rundll32.exe powrprof.dll,SetSuspendState 1,1,0
-                Write-Log "Alternative hibernation method attempted"
             } catch {
-                Write-Log "ERROR: All hibernation methods failed"
                 return $false
             }
         }
     }
-    
     return $true
 }
 
 # Main monitoring loop
-Write-Log "VM Internal Hibernation Monitor Started"
-Write-Log "   Inactivity timeout: $InactivityTimeoutMinutes minutes"
-Write-Log "   Check interval: $CheckIntervalSeconds seconds"
-Write-Log "   Log file: $LogFile"
-Write-Log ""
-
 $inactivityThresholdSeconds = $InactivityTimeoutMinutes * 60
-$consecutiveInactiveChecks = 0
-$requiredInactiveChecks = [math]::Max(1, [math]::Floor($inactivityThresholdSeconds / $CheckIntervalSeconds))
-
-Write-Log "Monitoring for inactivity... (Press Ctrl+C to stop)"
 
 try {
     while ($true) {
         $idleSeconds = Get-SystemIdleTimeSeconds
-        $idleMinutes = [math]::Round($idleSeconds / 60, 2)
-        Write-Log "System idle for $idleMinutes minutes."
-
+        
         # Always show progress
         $remainingSeconds = $inactivityThresholdSeconds - $idleSeconds
         $percentComplete = [math]::Min(100, [math]::Round(($idleSeconds / $inactivityThresholdSeconds) * 100, 1))
         $remainingMinutes = [math]::Round($remainingSeconds / 60, 1)
         $statusMessage = "Hibernating in $remainingMinutes minutes if idle."
         if ($idleSeconds -gt 0) {
+            $idleMinutes = [math]::Round($idleSeconds / 60, 2)
             $statusMessage = "Hibernating in $remainingMinutes minutes. Idle for $idleMinutes minutes."
         }
         Write-Progress -Activity "VM Auto-Hibernation Monitor" -Status $statusMessage -PercentComplete $percentComplete
 
-        if ($idleSeconds -lt $inactivityThresholdSeconds) {
-            # Activity detected, reset counter
-            if ($consecutiveInactiveChecks -gt 0) {
-                Write-Log "Activity detected. Resetting hibernation counter."
-                $consecutiveInactiveChecks = 0
-            }
-        } else {
-            # Inactivity threshold met, increment counter
-            $consecutiveInactiveChecks++
-            Write-Log "Inactivity threshold met. Hibernation check $consecutiveInactiveChecks/$requiredInactiveChecks."
-            
-            if ($consecutiveInactiveChecks -ge $requiredInactiveChecks) {
-                Write-Log "Hibernation threshold reached. Initiating hibernation..."
-                try { Write-Progress -Activity "VM Auto-Hibernation Monitor" -Completed -ErrorAction SilentlyContinue } catch {}
-                
-                if (Invoke-VMHibernation) {
-                    Write-Log "VM hibernation initiated successfully."
-                    break
-                } else {
-                    Write-Log "Failed to hibernate VM, continuing monitoring..."
-                    $consecutiveInactiveChecks = 0  # Reset to avoid repeated failed attempts
-                }
+        if ($idleSeconds -ge $inactivityThresholdSeconds) {
+            try { Write-Progress -Activity "VM Auto-Hibernation Monitor" -Completed -ErrorAction SilentlyContinue } catch {}
+            if (Invoke-VMHibernation) {
+                break # Exit loop on successful hibernation
             }
         }
         
         Start-Sleep -Seconds $CheckIntervalSeconds
     }
-    
 } catch {
-    Write-Log "Monitoring interrupted: $_"
+    # Catch Ctrl+C or other terminating errors
 } finally {
-    Write-Progress -Activity "VM Hibernation Monitor" -Completed
-    Write-Log "VM Internal Hibernation Monitor stopped"
+    try { Write-Progress -Activity "VM Auto-Hibernation Monitor" -Completed -ErrorAction SilentlyContinue } catch {}
 }
