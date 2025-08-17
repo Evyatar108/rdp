@@ -31,17 +31,12 @@ if (-not (Test-Administrator)) {
     exit 1
 }
 
-function Write-Status {
-    param([string]$Message, [string]$Color = "Green")
-    Write-Host $Message -ForegroundColor $Color
-}
-
 function Install-InternalMonitor {
-    Write-Status "Installing VM Internal Hibernation Monitor..." "Cyan"
+    Write-Host "Installing VM Internal Hibernation Monitor..." -ForegroundColor Cyan
     
     # Create directory structure
     if (-not (Test-Path $VMPath)) {
-        Write-Status "Creating directory: $VMPath"
+        Write-Host "Creating directory: $VMPath" -ForegroundColor Green
         New-Item -Path $VMPath -ItemType Directory -Force | Out-Null
     }
     
@@ -50,15 +45,15 @@ function Install-InternalMonitor {
     $targetScript = Join-Path $VMPath "vm-internal-hibernation-monitor.ps1"
     
     if (Test-Path $sourceScript) {
-        Write-Status "Copying monitor script to VM..."
+        Write-Host "Copying monitor script to VM..." -ForegroundColor Green
         Copy-Item $sourceScript $targetScript -Force
-        Write-Status "Monitor script copied to: $targetScript"
+        Write-Host "Monitor script copied to: $targetScript" -ForegroundColor Green
     } else {
         throw "Source monitor script not found: $sourceScript"
     }
     
     # Create scheduled task
-    Write-Status "Creating scheduled task for automatic startup..."
+    Write-Host "Creating scheduled task for automatic startup..." -ForegroundColor Green
     
     $taskName = "VMHibernationMonitor"
     $taskDescription = "Automatically hibernates VM after $InactivityTimeoutMinutes minutes of inactivity"
@@ -66,7 +61,7 @@ function Install-InternalMonitor {
     # Remove existing task if it exists
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($existingTask) {
-        Write-Status "Removing existing scheduled task..."
+        Write-Host "Removing existing scheduled task..." -ForegroundColor Green
         Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
     }
     
@@ -89,102 +84,102 @@ function Install-InternalMonitor {
     # Register the task
     try {
         Register-ScheduledTask -TaskName $taskName -Description $taskDescription -Action $action -Trigger $trigger -Settings $settings -Principal $principal | Out-Null
-        Write-Status "Scheduled task '$taskName' created successfully"
+        Write-Host "Scheduled task '$taskName' created successfully" -ForegroundColor Green
     } catch {
-        Write-Status "❌ Failed to create scheduled task: $_" "Red"
+        Write-Host "Failed to create scheduled task: $_" -ForegroundColor Red
         throw "Scheduled task creation failed"
     }
     
     # Start the task immediately
-    Write-Status "Starting hibernation monitor..."
+    Write-Host "Starting hibernation monitor..." -ForegroundColor Green
     try {
         Start-ScheduledTask -TaskName $taskName
-        Write-Status "Hibernation monitor started"
+        Write-Host "Hibernation monitor started" -ForegroundColor Green
     } catch {
-        Write-Status "Failed to start task immediately: $_" "Yellow"
-        Write-Status "   Task will start automatically on next boot" "Gray"
+        Write-Host "Failed to start task immediately: $_" -ForegroundColor Yellow
+        Write-Host "   Task will start automatically on next boot" -ForegroundColor Gray
     }
     
-    Write-Status "VM Internal Hibernation Monitor installed and started!" "Green"
-    Write-Status "   Monitor script: $targetScript" "Gray"
-    Write-Status "   Inactivity timeout: $InactivityTimeoutMinutes minutes" "Gray"
-    Write-Status "   Log file: $env:TEMP\hibernation-monitor.log" "Gray"
-    Write-Status "   Scheduled task: $taskName" "Gray"
+    Write-Host "VM Internal Hibernation Monitor installed and started!" -ForegroundColor Green
+    Write-Host "   Monitor script: $targetScript" -ForegroundColor Gray
+    Write-Host "   Inactivity timeout: $InactivityTimeoutMinutes minutes" -ForegroundColor Gray
+    Write-Host "   Log file: $env:TEMP\hibernation-monitor.log" -ForegroundColor Gray
+    Write-Host "   Scheduled task: $taskName" -ForegroundColor Gray
 }
 
 function Uninstall-InternalMonitor {
-    Write-Status "Uninstalling VM Internal Hibernation Monitor..." "Yellow"
+    Write-Host "Uninstalling VM Internal Hibernation Monitor..." -ForegroundColor Yellow
     
     $taskName = "VMHibernationMonitor"
     
     # Remove scheduled task
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($existingTask) {
-        Write-Status "Stopping and removing scheduled task..."
+        Write-Host "Stopping and removing scheduled task..." -ForegroundColor Green
         Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
         Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-        Write-Status "Scheduled task removed"
+        Write-Host "Scheduled task removed" -ForegroundColor Green
     } else {
-        Write-Status "No scheduled task found to remove"
+        Write-Host "No scheduled task found to remove" -ForegroundColor Green
     }
     
     # Remove files
     if (Test-Path $VMPath) {
-        Write-Status "Removing hibernation monitor files..."
+        Write-Host "Removing hibernation monitor files..." -ForegroundColor Green
         Remove-Item $VMPath -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Status "Monitor files removed"
+        Write-Host "Monitor files removed" -ForegroundColor Green
     }
     
-    Write-Status "VM Internal Hibernation Monitor uninstalled successfully!" "Green"
+    Write-Host "VM Internal Hibernation Monitor uninstalled successfully!" -ForegroundColor Green
 }
 
 function Show-Status {
-    Write-Status "VM Internal Hibernation Monitor Status" "Cyan"
-    Write-Status "=========================================" "Cyan"
+    Write-Host "VM Internal Hibernation Monitor Status" -ForegroundColor Cyan
+    Write-Host "=========================================" -ForegroundColor Cyan
     
     $taskName = "VMHibernationMonitor"
     $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     
     if ($task) {
         $taskInfo = Get-ScheduledTaskInfo -TaskName $taskName
-        Write-Status "Scheduled Task: $($task.State)" "Green"
-        Write-Status "   Last Run: $($taskInfo.LastRunTime)" "Gray"
-        Write-Status "   Next Run: $($taskInfo.NextRunTime)" "Gray"
-        Write-Status "   Last Result: $($taskInfo.LastTaskResult)" "Gray"
+        Write-Host "Scheduled Task: $($task.State)" -ForegroundColor Green
+        Write-Host "   Last Run: $($taskInfo.LastRunTime)" -ForegroundColor Gray
+        Write-Host "   Next Run: $($taskInfo.NextRunTime)" -ForegroundColor Gray
+        Write-Host "   Last Result: $($taskInfo.LastTaskResult)" -ForegroundColor Gray
     } else {
-        Write-Status "Scheduled task not found" "Red"
+        Write-Host "Scheduled task not found" -ForegroundColor Red
     }
     
     $scriptPath = Join-Path $VMPath "vm-internal-hibernation-monitor.ps1"
     if (Test-Path $scriptPath) {
-        Write-Status "Monitor script: Installed" "Green"
-        Write-Status "   Location: $scriptPath" "Gray"
+        Write-Host "Monitor script: Installed" -ForegroundColor Green
+        Write-Host "   Location: $scriptPath" -ForegroundColor Gray
     } else {
-        Write-Status "Monitor script: Not found" "Red"
+        Write-Host "Monitor script: Not found" -ForegroundColor Red
     }
     
     $logPath = "$env:TEMP\hibernation-monitor.log"
     if (Test-Path $logPath) {
         $logSize = (Get-Item $logPath).Length
-        Write-Status "Log file: $logSize bytes" "Green"
-        Write-Status "   Location: $logPath" "Gray"
+        Write-Host "Log file: $logSize bytes" -ForegroundColor Green
+        Write-Host "   Location: $logPath" -ForegroundColor Gray
         
         # Show last few log entries
         $lastEntries = Get-Content $logPath -Tail 5 -ErrorAction SilentlyContinue
         if ($lastEntries) {
-            Write-Status "   Recent log entries:" "Gray"
+            Write-Host "   Recent log entries:" -ForegroundColor Gray
             foreach ($entry in $lastEntries) {
-                Write-Status "     $entry" "DarkGray"
+                Write-Host "     $entry" -ForegroundColor DarkGray
             }
         }
     } else {
-        Write-Status "Log file: Not found" "Yellow"
+        Write-Host "Log file: Not found" -ForegroundColor Yellow
     }
 }
 
 # Main execution
-Write-Status "VM Internal Hibernation Monitor Deployment" "Green"
-Write-Status "===========================================" "Green"
+Write-Host "VM Internal Hibernation Monitor Deployment" -ForegroundColor Green
+Write-Host "===========================================" -ForegroundColor Green
 
 if ($Uninstall) {
     Uninstall-InternalMonitor
@@ -192,8 +187,8 @@ if ($Uninstall) {
     # Check if running inside a VM
     $isVM = (Get-WmiObject -Class Win32_ComputerSystem).Model -match "Virtual|VMware|VirtualBox|Hyper-V"
     if (-not $isVM) {
-        Write-Status "Warning: This does not appear to be running inside a VM" "Yellow"
-        Write-Status "   Continuing anyway..." "Yellow"
+        Write-Host "Warning: This does not appear to be running inside a VM" -ForegroundColor Yellow
+        Write-Host "   Continuing anyway..." -ForegroundColor Yellow
     }
     
     Install-InternalMonitor
@@ -201,9 +196,9 @@ if ($Uninstall) {
     Show-Status
 }
 
-Write-Status ""
-Write-Status "Usage Tips:" "Yellow"
-Write-Status "   - To check status: .\deploy-internal-monitor.ps1" "Gray"
-Write-Status "   - To uninstall: .\deploy-internal-monitor.ps1 -Uninstall" "Gray"
-Write-Status "   - To change timeout: .\deploy-internal-monitor.ps1 -InactivityTimeoutMinutes 15" "Gray"
-Write-Status "   - View logs: Get-Content $($env:TEMP)\hibernation-monitor.log)" "Gray"
+Write-Host ""
+Write-Host "Usage Tips:" -ForegroundColor Yellow
+Write-Host "   - To check status: .\deploy-internal-monitor.ps1" -ForegroundColor Gray
+Write-Host "   - To uninstall: .\deploy-internal-monitor.ps1 -Uninstall" -ForegroundColor Gray
+Write-Host "   - To change timeout: .\deploy-internal-monitor.ps1 -InactivityTimeoutMinutes 15" -ForegroundColor Gray
+Write-Host "   - View logs: Get-Content `$env:TEMP\hibernation-monitor.log" -ForegroundColor Gray
