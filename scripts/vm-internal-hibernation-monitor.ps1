@@ -113,9 +113,44 @@ try {
 
         if ($idleSeconds -ge $inactivityThresholdSeconds) {
             try { Write-Progress -Activity "VM Auto-Hibernation Monitor" -Completed -ErrorAction SilentlyContinue } catch {}
-            Invoke-VMHibernation
-            # Let hibernation process run naturally - do not exit the script
-            # The system will shut down when hibernation completes
+            Write-Host ""
+            Write-Host "Idle threshold reached. Triggering hibernation..." -ForegroundColor Yellow
+            
+            $hibernationResult = Invoke-VMHibernation
+            
+            if ($hibernationResult) {
+                Write-Host "Hibernation command sent successfully." -ForegroundColor Green
+                Write-Host "Resetting countdown timer to prevent immediate re-hibernation." -ForegroundColor Cyan
+                Write-Host "Monitor will continue with fresh idle time tracking..." -ForegroundColor Yellow
+                
+                # Reset the idle time tracking by waiting for user activity
+                # This prevents immediate re-hibernation if the VM resumes quickly
+                $resetWaitTime = 6000  # 5 minutes buffer after hibernation
+                Write-Host "Waiting $($resetWaitTime/60) minutes buffer before resuming monitoring..." -ForegroundColor Gray
+                
+                for ($resetCounter = $resetWaitTime; $resetCounter -gt 0; $resetCounter -= $CheckIntervalSeconds) {
+                    $waitTime = [math]::Min($CheckIntervalSeconds, $resetCounter)
+                    Start-Sleep -Seconds $waitTime
+                    
+                    # Check for user activity during reset period
+                    $currentIdleSeconds = Get-SystemIdleTimeSeconds
+                    if ($currentIdleSeconds -lt 30) {  # If user active in last 30 seconds
+                        Write-Host "User activity detected during buffer period. Resuming normal monitoring..." -ForegroundColor Green
+                        break
+                    }
+                    
+                    $remainingResetMinutes = [math]::Round($resetCounter / 60, 1)
+                    Write-Progress -Activity "Hibernation Reset Buffer" -Status "Resuming monitoring in $remainingResetMinutes minutes" -PercentComplete (($resetWaitTime - $resetCounter) / $resetWaitTime * 100)
+                }
+                
+                try { Write-Progress -Activity "Hibernation Reset Buffer" -Completed -ErrorAction SilentlyContinue } catch {}
+                Write-Host "Resuming normal hibernation monitoring..." -ForegroundColor Green
+                
+            } else {
+                Write-Host "Hibernation failed. Monitor will continue..." -ForegroundColor Red
+                Write-Host "Will retry when idle threshold is reached again." -ForegroundColor Yellow
+                # Continue monitoring without reset - hibernation failed so no need for buffer
+            }
         }
         
         Start-Sleep -Seconds $CheckIntervalSeconds
