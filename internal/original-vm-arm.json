@@ -1,0 +1,114 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualMachines_DesktopVM_name": {
+            "defaultValue": "DesktopVM",
+            "type": "String"
+        },
+        "disks_DesktopVM_OsDisk_1_e2ca4057497b4ebb9cb9150842e3ecfb_externalid": {
+            "defaultValue": "/subscriptions/42345215-fae0-4d93-b24c-f15b3cb6feeb/resourceGroups/VM-RG/providers/Microsoft.Compute/disks/DesktopVM_OsDisk_1_e2ca4057497b4ebb9cb9150842e3ecfb",
+            "type": "String"
+        },
+        "disks_DesktopVM_DataDisk_0_externalid": {
+            "defaultValue": "/subscriptions/42345215-fae0-4d93-b24c-f15b3cb6feeb/resourceGroups/VM-RG/providers/Microsoft.Compute/disks/DesktopVM_DataDisk_0",
+            "type": "String"
+        },
+        "networkInterfaces_desktopvm252_externalid": {
+            "defaultValue": "/subscriptions/42345215-fae0-4d93-b24c-f15b3cb6feeb/resourceGroups/VM-RG/providers/Microsoft.Network/networkInterfaces/desktopvm252",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2024-11-01",
+            "name": "[parameters('virtualMachines_DesktopVM_name')]",
+            "location": "germanywestcentral",
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "Standard_A2m_v2"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "MicrosoftWindowsDesktop",
+                        "offer": "Windows-10",
+                        "sku": "rs5-pro",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "osType": "Windows",
+                        "name": "[concat(parameters('virtualMachines_DesktopVM_name'), '_OsDisk_1_e2ca4057497b4ebb9cb9150842e3ecfb')]",
+                        "createOption": "FromImage",
+                        "caching": "ReadWrite",
+                        "managedDisk": {
+                            "storageAccountType": "Standard_LRS",
+                            "id": "[parameters('disks_DesktopVM_OsDisk_1_e2ca4057497b4ebb9cb9150842e3ecfb_externalid')]"
+                        },
+                        "diskSizeGB": 127
+                    },
+                    "dataDisks": [
+                        {
+                            "lun": 0,
+                            "name": "[concat(parameters('virtualMachines_DesktopVM_name'), '_DataDisk_0')]",
+                            "createOption": "Attach",
+                            "caching": "None",
+                            "writeAcceleratorEnabled": false,
+                            "managedDisk": {
+                                "storageAccountType": "Standard_LRS",
+                                "id": "[parameters('disks_DesktopVM_DataDisk_0_externalid')]"
+                            },
+                            "diskSizeGB": 32,
+                            "toBeDetached": false
+                        }
+                    ]
+                },
+                "osProfile": {
+                    "computerName": "[parameters('virtualMachines_DesktopVM_name')]",
+                    "adminUsername": "***",
+                    "windowsConfiguration": {
+                        "provisionVMAgent": true,
+                        "enableAutomaticUpdates": true,
+                        "patchSettings": {
+                            "patchMode": "AutomaticByOS",
+                            "assessmentMode": "ImageDefault"
+                        }
+                    },
+                    "secrets": [],
+                    "allowExtensionOperations": true,
+                    "requireGuestProvisionSignal": true
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[parameters('networkInterfaces_desktopvm252_externalid')]"
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true,
+                        "storageUri": "https://vmrgdiag144.blob.core.windows.net/"
+                    }
+                },
+                "licenseType": "Windows_Client"
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2024-11-01",
+            "name": "[concat(parameters('virtualMachines_DesktopVM_name'), '/AzureNetworkWatcherExtension')]",
+            "location": "germanywestcentral",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_DesktopVM_name'))]"
+            ],
+            "properties": {
+                "autoUpgradeMinorVersion": true,
+                "publisher": "Microsoft.Azure.NetworkWatcher",
+                "type": "NetworkWatcherAgentWindows",
+                "typeHandlerVersion": "1.4"
+            }
+        }
+    ]
+}

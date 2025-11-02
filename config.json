@@ -1,0 +1,41 @@
+{
+  "azure": {
+    "target": {
+      "tenantId": "66d51e14-99b9-435a-8c05-449dc0c91710",
+      "subscriptionId": "30748a75-b2b8-4e4f-b5df-e87aa4ceef7b",
+      "resourceGroup": "VM-RG-TARGET",
+      "vmName": "DesktopVM"
+    }
+  },
+  "hibernation": {
+    "timing": {
+      "delayAfterRdpCloseSeconds": 300,
+      "progressUpdateIntervalSeconds": 1,
+      "hibernationResumeWaitSeconds": 60
+    },
+    "showMonitorWindow": true,
+    "external": {
+      "enabled": false,
+      "inactivityTimeoutMinutes": 60
+    },
+    "internal": {
+      "enabled": true,
+      "inactivityTimeoutMinutes": 60,
+      "checkIntervalSeconds": 60
+    }
+  },
+  "autoUpdate": {
+    "enabled": true,
+    "git": {
+      "autoInstall": true,
+      "installPaths": [
+        "C:\\Program Files\\Git\\cmd",
+        "C:\\Program Files (x86)\\Git\\cmd"
+      ]
+    }
+  },
+  "logging": {
+    "verboseOutput": true,
+    "showDetailedErrors": true
+  }
+}

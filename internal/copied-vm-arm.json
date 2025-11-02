@@ -1,0 +1,71 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualMachines_DesktopVM_name": {
+            "defaultValue": "DesktopVM",
+            "type": "String"
+        },
+        "disks_DesktopVM_OS_Managed_externalid": {
+            "defaultValue": "/subscriptions/30748a75-b2b8-4e4f-b5df-e87aa4ceef7b/resourceGroups/VM-RG-TARGET/providers/Microsoft.Compute/disks/DesktopVM-OS-Managed",
+            "type": "String"
+        },
+        "disks_DesktopVM_Data0_Managed_externalid": {
+            "defaultValue": "/subscriptions/30748a75-b2b8-4e4f-b5df-e87aa4ceef7b/resourceGroups/VM-RG-TARGET/providers/Microsoft.Compute/disks/DesktopVM-Data0-Managed",
+            "type": "String"
+        },
+        "networkInterfaces_nic_desktopvm_externalid": {
+            "defaultValue": "/subscriptions/30748a75-b2b8-4e4f-b5df-e87aa4ceef7b/resourceGroups/VM-RG-TARGET/providers/Microsoft.Network/networkInterfaces/nic-desktopvm",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2024-11-01",
+            "name": "[parameters('virtualMachines_DesktopVM_name')]",
+            "location": "germanywestcentral",
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "Standard_A4m_v2"
+                },
+                "storageProfile": {
+                    "osDisk": {
+                        "osType": "Windows",
+                        "name": "[concat(parameters('virtualMachines_DesktopVM_name'), '-OS-Managed')]",
+                        "createOption": "Attach",
+                        "caching": "ReadWrite",
+                        "managedDisk": {
+                            "id": "[parameters('disks_DesktopVM_OS_Managed_externalid')]"
+                        },
+                        "deleteOption": "Detach"
+                    },
+                    "dataDisks": [
+                        {
+                            "lun": 0,
+                            "name": "[concat(parameters('virtualMachines_DesktopVM_name'), '-Data0-Managed')]",
+                            "createOption": "Attach",
+                            "caching": "None",
+                            "managedDisk": {
+                                "id": "[parameters('disks_DesktopVM_Data0_Managed_externalid')]"
+                            },
+                            "deleteOption": "Detach",
+                            "toBeDetached": false
+                        }
+                    ]
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[parameters('networkInterfaces_nic_desktopvm_externalid')]",
+                            "properties": {
+                                "primary": true
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
