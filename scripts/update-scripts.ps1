@@ -141,7 +141,7 @@ if ($AUTO_UPDATE_ENABLED) {
             
             # Perform git pull
             Write-Host " Pulling latest updates..." -ForegroundColor Cyan
-            $pullResult = git pull 2>&1
+            $pullResult = git pull --force 2>&1
             $pullExitCode = $LASTEXITCODE
             
             # Get commit hash after pull
