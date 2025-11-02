@@ -136,24 +136,15 @@ if ($AUTO_UPDATE_ENABLED) {
         $isGitRepo = git rev-parse --is-inside-work-tree 2>$null
         
         if ($isGitRepo -eq "true") {
-            # Get current commit hash before update
+            # Get current commit hash before pull
             $beforeHash = git rev-parse HEAD 2>$null
             
-            # Fetch latest updates and reset to origin/master
-            Write-Host " Fetching latest updates..." -ForegroundColor Cyan
-            $fetchResult = git fetch origin 2>&1
-            $fetchExitCode = $LASTEXITCODE
+            # Perform git pull
+            Write-Host " Pulling latest updates..." -ForegroundColor Cyan
+            $pullResult = git pull 2>&1
+            $pullExitCode = $LASTEXITCODE
             
-            if ($fetchExitCode -eq 0) {
-                Write-Host " Resetting to origin/master..." -ForegroundColor Cyan
-                $resetResult = git reset --hard origin/master 2>&1
-                $pullExitCode = $LASTEXITCODE
-            } else {
-                $pullExitCode = $fetchExitCode
-                Write-Host " Fetch failed, continuing with current version..." -ForegroundColor Yellow
-            }
-            
-            # Get commit hash after update
+            # Get commit hash after pull
             $afterHash = git rev-parse HEAD 2>$null
             
             # Check if any changes were pulled
