@@ -15,6 +15,16 @@ $connectScript = Join-Path $scriptDirectory "scripts\connect-vm-rdp.ps1"
 if (Test-Path $updateScript) {
     $scriptsUpdated = & $updateScript
     Write-Host "" # Empty line for spacing
+    
+    # If scripts were updated, restart this script to use the new version
+    if ($scriptsUpdated) {
+        Write-Host " Scripts updated! Restarting with new version..." -ForegroundColor Yellow
+        Write-Host ""
+        
+        # Re-execute this script with the updated version
+        & $MyInvocation.MyCommand.Path
+        exit 0
+    }
 } else {
     Write-Host " Update script not found - continuing with current scripts" -ForegroundColor Yellow
     Write-Host "" # Empty line for spacing
