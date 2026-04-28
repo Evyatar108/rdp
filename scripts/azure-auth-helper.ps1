@@ -54,6 +54,9 @@ function Ensure-AzureCLIAuthenticated {
         [switch]$Quiet
     )
 
+    # Make sure az CLI exists before any az invocation
+    Ensure-AzureCLIInstalled -Quiet:$Quiet
+
     # Check current authentication status
     $currentAccount = $null
     $needsLogin = $false
