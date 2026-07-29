@@ -189,6 +189,43 @@ stop auto-starting it with RDP.
 - **Permission denied (publickey)** — key not deployed, wrong encoding (must be ASCII/UTF-8 no BOM), wrong ACL on `administrators_authorized_keys`, or the key was created with a passphrase
 - **Browser shows the Azure IP** — you launched a normal browser window instead of the shortcut; the proxy applies only to the dedicated profile
 
+### Proxying non-browser apps (any .exe) via ProxiFyre
+
+The browser shortcut above only covers Chromium-based browsers (they support
+`--proxy-server` natively). To route a specific **other** program's traffic
+through the same Proxy Point tunnel — including apps with no proxy settings
+at all — this repo also supports [ProxiFyre](https://github.com/wiresock/proxifyre),
+a free/open-source Windows SOCKS5 "proxifier" that redirects a named process's
+traffic at the network-driver level, completely transparent to the app itself.
+
+**Currently configured for:** `rivhit125.exe` (Rivhit accounting software).
+
+- **One-time setup (on the VM, elevated PowerShell):**
+  `.\scripts\deploy-proxifyre.ps1`
+  Installs the VC++ 2022 redistributable, the Windows Packet Filter (NDISAPI)
+  driver, and ProxiFyre itself as a Windows service (`ProxiFyreService`). The
+  service is left **stopped, StartType=Manual** — it never starts on its own
+  (not on boot, not tied to Proxy Point's RDP auto-start) so it stays fully
+  opt-in.
+- **To use it:** on the VM, double-click the **"Start Rivhit via Proxy"**
+  desktop shortcut (or run `.\scripts\vm-start-rivhit-proxy.ps1` elevated).
+  This starts `ProxiFyreService` and launches Rivhit — from then on, only
+  Rivhit's network traffic exits via your PC; everything else on the VM is
+  unaffected.
+- **To stop:** double-click **"Stop Rivhit Proxy"** (or run
+  `.\scripts\vm-stop-rivhit-proxy.ps1` elevated). This stops the service, so
+  Rivhit (after being restarted) reverts to normal VM/Azure egress.
+- **To proxy additional/different apps:** edit
+  `C:\ProxiFyre\app-config.json` on the VM (add executable names to
+  `appNames`, or add another object to the `proxies` array to route a
+  different app through a different SOCKS endpoint), then restart
+  `ProxiFyreService`. See the
+  [ProxiFyre config reference](https://github.com/wiresock/proxifyre#configuration)
+  for all options (per-app rules, exclusions, LAN bypass, etc.).
+- **Requires** the Proxy Point tunnel to already be running (same
+  `localhost:1080` SOCKS proxy the browser shortcut uses) — both start/stop
+  scripts check for it and fail fast with a clear message if it's down.
+
 ## 💰 Cost Savings
 
 - **Before:** VM running 24/7 = ~$50-100/month
