@@ -133,6 +133,51 @@ All settings are managed through a single JSON configuration file: **[`config.js
 - Monitor runs hidden in background
 - Automatic hibernation with no visible windows
 
+## 🌐 Proxy Point (VM browser exits via your PC)
+
+Route the VM's browser traffic through the PC you're connecting from, so websites
+see your PC's IP/location instead of the Azure datacenter network.
+
+**How it works:** your PC opens a reverse SSH tunnel to the VM
+(`ssh -R 1080 ...`). The VM gets a local SOCKS5 proxy on `localhost:1080` whose
+traffic egresses from your PC. A dedicated browser shortcut on the VM uses that
+proxy (with proxy-side DNS); everything else on the VM (including RDP) is unaffected.
+
+### Usage
+1. **On your PC:** run `.\scripts\enable-proxy-point.ps1` (keep the window open;
+   it auto-reconnects if the tunnel drops)
+2. **On the VM:** double-click the **"Browser via Proxy Point"** desktop shortcut
+   (or run `.\scripts\vm-browser-via-proxy.ps1`). It opens a browser tab showing
+   your egress IP — it should be your PC's IP.
+3. **To stop:** press `Ctrl+C` in the PC window, or run `.\scripts\disable-proxy-point.ps1`
+
+### Configuration (`config.json`)
+```json
+{
+  "proxyPoint": {
+    "socksPort": 1080,
+    "sshUser": "shabi108",
+    "sshKeyPath": "~/.ssh/vm-proxy_ed25519",
+    "autoReconnect": true,
+    "reconnectDelaySeconds": 5
+  }
+}
+```
+
+### One-time setup (already done for the current VM)
+- OpenSSH Server installed + running on the VM, firewall + NSG allow port 22
+- SSH keypair on the PC at `~/.ssh/vm-proxy_ed25519`; public key in
+  `C:\ProgramData\ssh\administrators_authorized_keys` on the VM (strict ACL:
+  only SYSTEM + Administrators, plain ASCII encoding)
+
+To set up an additional PC: `ssh-keygen -t ed25519 -f $env:USERPROFILE\.ssh\vm-proxy_ed25519 -N '' `
+then append the `.pub` contents to the VM's `administrators_authorized_keys`.
+
+### Troubleshooting
+- **"No tunnel detected" on the VM** — `enable-proxy-point.ps1` isn't running on the PC, or it failed to bind (check its window)
+- **Permission denied (publickey)** — key not deployed, wrong encoding (must be ASCII/UTF-8 no BOM), wrong ACL on `administrators_authorized_keys`, or the key was created with a passphrase
+- **Browser shows the Azure IP** — you launched a normal browser window instead of the shortcut; the proxy applies only to the dedicated profile
+
 ## 💰 Cost Savings
 
 - **Before:** VM running 24/7 = ~$50-100/month

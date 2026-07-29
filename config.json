@@ -7,6 +7,13 @@
       "vmName": "DesktopVM"
     }
   },
+  "proxyPoint": {
+    "socksPort": 1080,
+    "sshUser": "shabi108",
+    "sshKeyPath": "~/.ssh/vm-proxy_ed25519",
+    "autoReconnect": true,
+    "reconnectDelaySeconds": 5
+  },
   "hibernation": {
     "timing": {
       "delayAfterRdpCloseSeconds": 300,
