@@ -3,7 +3,7 @@
     "target": {
       "tenantId": "66d51e14-99b9-435a-8c05-449dc0c91710",
       "subscriptionId": "30748a75-b2b8-4e4f-b5df-e87aa4ceef7b",
-      "resourceGroup": "VM-RG-TARGET",
+      "resourceGroup": "VM-RG-ISRAEL",
       "vmName": "DesktopVM"
     }
   },

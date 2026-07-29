@@ -68,7 +68,7 @@ public struct LASTINPUTINFO
 function Invoke-VMHibernation {
     try {
         # VM details - these will be injected by the deployment script
-        $resourceGroup = "VM-RG-TARGET"
+        $resourceGroup = "VM-RG-ISRAEL"
         $vmName = "DesktopVM"
         
         Write-Host "Hibernating VM using Azure CLI..." -ForegroundColor Green
