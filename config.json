@@ -8,6 +8,8 @@
     }
   },
   "proxyPoint": {
+    "enabled": true,
+    "autoSetupKey": true,
     "socksPort": 1080,
     "sshUser": "shabi108",
     "sshKeyPath": "~/.ssh/vm-proxy_ed25519",

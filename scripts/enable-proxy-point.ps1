@@ -3,8 +3,15 @@
 # gets a local SOCKS5 proxy (localhost:1080) whose traffic EXITS through this PC.
 # Use the "Browser via Proxy Point" shortcut on the VM to browse through it.
 #
-# Requires: OpenSSH client (built into Windows 10/11), key deployed to the VM
-# (see README "Proxy Point" section).
+# Requires: OpenSSH client (built into Windows 10/11). The SSH key is generated
+# and authorized on the VM automatically on first use (via Azure run-command).
+#
+# -NoAuth: skip Azure CLI auth/key setup (used when launched from connect-vm-rdp.ps1
+#          which has already authenticated and ensured the key).
+
+param(
+    [switch]$NoAuth
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -19,24 +26,24 @@ $VM_NAME = $config.azure.target.vmName
 
 $SOCKS_PORT = $config.proxyPoint.socksPort
 $SSH_USER = $config.proxyPoint.sshUser
-$SSH_KEY = $config.proxyPoint.sshKeyPath -replace '^~', $env:USERPROFILE
 $AUTO_RECONNECT = $config.proxyPoint.autoReconnect
 $RECONNECT_DELAY = $config.proxyPoint.reconnectDelaySeconds
+
+. (Join-Path $PSScriptRoot "proxy-point-helper.ps1")
+$SSH_KEY = Get-ProxyPointKeyPath -Config $config
 
 Write-Host " Proxy Point (VM browser exits via this PC)" -ForegroundColor Green
 Write-Host "=============================================" -ForegroundColor Green
 
-# Validate SSH client + key
-if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) {
-    Write-Error "OpenSSH client (ssh) not found. Install 'OpenSSH Client' Windows optional feature."
+if (-not $NoAuth) {
+    # Ensure Azure CLI + auth (same helper as RDP script), then key setup
+    . (Join-Path $PSScriptRoot "azure-auth-helper.ps1")
+    Ensure-AzureCLIAuthenticated -TenantId $TENANT_B -SubscriptionId $SUB_B
+    Ensure-ProxyPointKey -Config $config
 }
-if (-not (Test-Path $SSH_KEY)) {
-    Write-Error "SSH key not found at $SSH_KEY. See README 'Proxy Point' section for setup."
+elseif (-not (Test-Path $SSH_KEY)) {
+    Write-Error "SSH key not found at $SSH_KEY (unexpected with -NoAuth). Run enable-proxy-point.ps1 without -NoAuth."
 }
-
-# Ensure Azure CLI + auth (same helper as RDP script)
-. (Join-Path $PSScriptRoot "azure-auth-helper.ps1")
-Ensure-AzureCLIAuthenticated -TenantId $TENANT_B -SubscriptionId $SUB_B
 
 # Ensure VM is running, then resolve public IP
 $powerState = az vm show -g $RG_B -n $VM_NAME -d --query "powerState" -o tsv

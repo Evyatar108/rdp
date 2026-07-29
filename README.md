@@ -144,17 +144,31 @@ traffic egresses from your PC. A dedicated browser shortcut on the VM uses that
 proxy (with proxy-side DNS); everything else on the VM (including RDP) is unaffected.
 
 ### Usage
-1. **On your PC:** run `.\scripts\enable-proxy-point.ps1` (keep the window open;
-   it auto-reconnects if the tunnel drops)
-2. **On the VM:** double-click the **"Browser via Proxy Point"** desktop shortcut
-   (or run `.\scripts\vm-browser-via-proxy.ps1`). It opens a browser tab showing
-   your egress IP — it should be your PC's IP.
-3. **To stop:** press `Ctrl+C` in the PC window, or run `.\scripts\disable-proxy-point.ps1`
+**Automatic (default):** just run `.\vm-rdp.ps1` as usual. When
+`proxyPoint.enabled` is `true` in `config.json`, the connect script:
+1. Generates an SSH key on this PC on first use (`proxyPoint.autoSetupKey`)
+2. Authorizes the key on the VM automatically (one-time, via Azure run-command —
+   works for any PC whose user can run the start script)
+3. Starts the tunnel in a minimized window alongside the RDP session
+
+Then, **on the VM:** double-click the **"Browser via Proxy Point"** desktop
+shortcut (or run `.\scripts\vm-browser-via-proxy.ps1`). It opens a browser tab
+showing your egress IP — it should be your PC's IP. Regular browser windows on
+the VM are NOT proxied.
+
+**Manual:** run `.\scripts\enable-proxy-point.ps1` yourself (keep the window
+open; it auto-reconnects if the tunnel drops).
+
+**To stop:** close the minimized tunnel window (or Ctrl+C), or run
+`.\scripts\disable-proxy-point.ps1`. Set `proxyPoint.enabled` to `false` to
+stop auto-starting it with RDP.
 
 ### Configuration (`config.json`)
 ```json
 {
   "proxyPoint": {
+    "enabled": true,
+    "autoSetupKey": true,
     "socksPort": 1080,
     "sshUser": "shabi108",
     "sshKeyPath": "~/.ssh/vm-proxy_ed25519",
@@ -164,17 +178,14 @@ proxy (with proxy-side DNS); everything else on the VM (including RDP) is unaffe
 }
 ```
 
-### One-time setup (already done for the current VM)
+### VM-side setup (already done for the current VM)
 - OpenSSH Server installed + running on the VM, firewall + NSG allow port 22
-- SSH keypair on the PC at `~/.ssh/vm-proxy_ed25519`; public key in
-  `C:\ProgramData\ssh\administrators_authorized_keys` on the VM (strict ACL:
-  only SYSTEM + Administrators, plain ASCII encoding)
-
-To set up an additional PC: `ssh-keygen -t ed25519 -f $env:USERPROFILE\.ssh\vm-proxy_ed25519 -N '' `
-then append the `.pub` contents to the VM's `administrators_authorized_keys`.
+- Keys live in `C:\ProgramData\ssh\administrators_authorized_keys` on the VM
+  (strict ACL: only SYSTEM + Administrators, plain ASCII encoding). Each
+  connecting PC gets its own key added automatically on first run.
 
 ### Troubleshooting
-- **"No tunnel detected" on the VM** — `enable-proxy-point.ps1` isn't running on the PC, or it failed to bind (check its window)
+- **"No tunnel detected" on the VM** — the tunnel isn't running on the PC (check for the minimized "enable-proxy-point" window, or run it manually), or it failed to bind (check its window)
 - **Permission denied (publickey)** — key not deployed, wrong encoding (must be ASCII/UTF-8 no BOM), wrong ACL on `administrators_authorized_keys`, or the key was created with a passphrase
 - **Browser shows the Azure IP** — you launched a normal browser window instead of the shortcut; the proxy applies only to the dedicated profile
 

@@ -95,6 +95,30 @@ administrative session:i:1
 
 Set-Content -Path $tempRdpFile -Value $rdpContent -Force
 
+# Start proxy point tunnel (VM browser egress via this PC) if enabled
+if ($config.proxyPoint.enabled) {
+    Write-Host " Setting up proxy point (VM browser exits via this PC)..." -ForegroundColor Yellow
+    try {
+        . (Join-Path $PSScriptRoot "proxy-point-helper.ps1")
+        if (Test-ProxyPointRunning -Config $config) {
+            Write-Host " Proxy point tunnel already running" -ForegroundColor Green
+        }
+        else {
+            Ensure-ProxyPointKey -Config $config
+            $proxyScript = Join-Path $PSScriptRoot "enable-proxy-point.ps1"
+            Start-Process "powershell.exe" -ArgumentList @(
+                "-ExecutionPolicy", "Bypass", "-File", "`"$proxyScript`"", "-NoAuth"
+            ) -WindowStyle Minimized | Out-Null
+            Write-Host " Proxy point tunnel started (minimized window)" -ForegroundColor Green
+            Write-Host "   Use the 'Browser via Proxy Point' shortcut on the VM to browse via this PC" -ForegroundColor Gray
+        }
+    }
+    catch {
+        Write-Host " Proxy point setup failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "   RDP will continue; VM browser shortcut won't work until fixed" -ForegroundColor Gray
+    }
+}
+
 # Connect via RDP
 Write-Host " Launching RDP connection..." -ForegroundColor Yellow
 $rdpProcess = Start-Process "mstsc" -ArgumentList "`"$tempRdpFile`"" -WindowStyle Normal -PassThru
