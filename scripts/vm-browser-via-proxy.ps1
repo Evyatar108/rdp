@@ -36,9 +36,9 @@ $profileDir = Join-Path $env:LOCALAPPDATA "ProxyPointBrowserProfile"
 
 Write-Host " Launching browser through proxy point (localhost:$SocksPort)..." -ForegroundColor Green
 Start-Process $browser -ArgumentList @(
-    "--proxy-server=socks5://127.0.0.1:$SocksPort",
-    "--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1",  # force DNS through the SOCKS proxy too
-    "--user-data-dir=$profileDir",
+    "--proxy-server=`"socks5://127.0.0.1:$SocksPort`"",
+    "--host-resolver-rules=`"MAP * ~NOTFOUND , EXCLUDE 127.0.0.1`"",  # force DNS through the SOCKS proxy too
+    "--user-data-dir=`"$profileDir`"",
     "--no-first-run",
     "https://api.ipify.org?format=json"
 )
