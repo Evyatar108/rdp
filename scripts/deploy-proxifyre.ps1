@@ -7,6 +7,10 @@
 #      interception driver ProxiFyre is built on
 #   3. ProxiFyre itself (wiresock/proxifyre), installed as a Windows service
 #      named "ProxiFyreService"
+#   4. Windows Firewall allow rules for ProxiFyre.exe (both directions) -
+#      REQUIRED: without these, the driver still intercepts matched processes'
+#      traffic but ProxiFyre's own relay connection to the SOCKS endpoint
+#      silently hangs/times out (confirmed via live testing).
 #
 # The service is installed with StartType=Manual and left STOPPED - it never
 # starts on its own (not on boot, not tied to Proxy Point auto-start). Use
@@ -122,6 +126,23 @@ else {
     Write-Host " ProxiFyreService already installed." -ForegroundColor Gray
 }
 if (-not $svc) { throw "ProxiFyreService not found after install - check ProxiFyre.exe output above." }
+
+# 5b. CRITICAL: Windows Firewall silently blocks ProxiFyre's own outbound relay
+# connections to the SOCKS endpoint without this rule - the driver still
+# intercepts/redirects matched processes' traffic, but ProxiFyre's attempt to
+# forward it then hangs/times out with no error surfaced anywhere (confirmed
+# via live testing: adding this rule was the difference between a proxied
+# request working end-to-end vs. timing out). The ProxiFyre README calls this
+# out as a troubleshooting step, but it's applied here unconditionally so a
+# fresh deploy works out of the box.
+Write-Host " Adding firewall rules for ProxiFyre.exe (required - see comment above)..." -ForegroundColor Yellow
+$exeForRule = Join-Path $InstallDir "ProxiFyre.exe"
+if (-not (Get-NetFirewallRule -DisplayName "ProxiFyre Inbound" -ErrorAction SilentlyContinue)) {
+    New-NetFirewallRule -DisplayName "ProxiFyre Inbound" -Direction Inbound -Program $exeForRule -Action Allow -Profile Any | Out-Null
+}
+if (-not (Get-NetFirewallRule -DisplayName "ProxiFyre Outbound" -ErrorAction SilentlyContinue)) {
+    New-NetFirewallRule -DisplayName "ProxiFyre Outbound" -Direction Outbound -Program $exeForRule -Action Allow -Profile Any | Out-Null
+}
 
 sc.exe config ProxiFyreService start= demand | Out-Null
 if ($svc.Status -eq "Running") { Stop-Service -Name "ProxiFyreService" -Force }

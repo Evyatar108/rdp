@@ -198,15 +198,25 @@ at all — this repo also supports [ProxiFyre](https://github.com/wiresock/proxi
 a free/open-source Windows SOCKS5 "proxifier" that redirects a named process's
 traffic at the network-driver level, completely transparent to the app itself.
 
-**Currently configured for:** `rivhit125.exe` (Rivhit accounting software).
+**Currently configured for:** the entire `C:\Rivhit\` install folder (matched
+by path, not just `rivhit125.exe`) — this also covers helper/child processes
+Rivhit spawns under a different exe name (e.g. `icredit.exe`, `BatchEMV.exe`),
+since ProxiFyre matches by process name/path and does **not** follow
+parent→child relationships; same-named multiple instances of one exe are
+already covered automatically, but a differently-named child needs its own
+match, which is why the whole folder is targeted here.
 
 - **One-time setup (on the VM, elevated PowerShell):**
   `.\scripts\deploy-proxifyre.ps1`
   Installs the VC++ 2022 redistributable, the Windows Packet Filter (NDISAPI)
-  driver, and ProxiFyre itself as a Windows service (`ProxiFyreService`). The
-  service is left **stopped, StartType=Manual** — it never starts on its own
-  (not on boot, not tied to Proxy Point's RDP auto-start) so it stays fully
-  opt-in.
+  driver, ProxiFyre itself as a Windows service (`ProxiFyreService`), and
+  **required Windows Firewall allow rules for `ProxiFyre.exe`** — without
+  those rules the driver still intercepts matched processes' traffic, but
+  ProxiFyre's own relay connection to the SOCKS endpoint silently hangs/times
+  out with no visible error (confirmed via live testing — this is the one
+  non-obvious gotcha with this tool). The service is left **stopped,
+  StartType=Manual** — it never starts on its own (not on boot, not tied to
+  Proxy Point's RDP auto-start) so it stays fully opt-in.
 - **To use it:** on the VM, double-click the **"Start Rivhit via Proxy"**
   desktop shortcut (or run `.\scripts\vm-start-rivhit-proxy.ps1` elevated).
   This starts `ProxiFyreService` and launches Rivhit — from then on, only
@@ -216,10 +226,10 @@ traffic at the network-driver level, completely transparent to the app itself.
   `.\scripts\vm-stop-rivhit-proxy.ps1` elevated). This stops the service, so
   Rivhit (after being restarted) reverts to normal VM/Azure egress.
 - **To proxy additional/different apps:** edit
-  `C:\ProxiFyre\app-config.json` on the VM (add executable names to
-  `appNames`, or add another object to the `proxies` array to route a
-  different app through a different SOCKS endpoint), then restart
-  `ProxiFyreService`. See the
+  `C:\ProxiFyre\app-config.json` on the VM (add executable names or
+  `"C:\\SomeFolder\\"`-style paths to `appNames`, or add another object to
+  the `proxies` array to route a different app through a different SOCKS
+  endpoint), then restart `ProxiFyreService`. See the
   [ProxiFyre config reference](https://github.com/wiresock/proxifyre#configuration)
   for all options (per-app rules, exclusions, LAN bypass, etc.).
 - **Requires** the Proxy Point tunnel to already be running (same
