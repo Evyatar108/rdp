@@ -21,26 +21,43 @@ This launcher script will:
 ├── 📄 vm-rdp.ps1          ← Main script (run this!)
 ├── 📄 config.json         ← All configuration settings
 ├── 📄 README.md           ← This guide
+├── 📄 CLAUDE.md           ← Gotchas/architecture notes for agents & contributors
 ├── 📂 scripts/            ← Internal scripts (auto-updated)
 │   ├── 📄 config-loader.ps1
+│   ├── 📄 azure-auth-helper.ps1
 │   ├── 📄 update-scripts.ps1
-│   ├── 📄 connect-vm-rdp.ps1
-│   └── 📄 hibernation-monitor.ps1
+│   ├── 📄 connect-vm-rdp.ps1        ← RDP connect + auto-starts Proxy Point tunnel
+│   ├── 📄 hibernation-monitor.ps1
+│   ├── 📄 stop-vm.ps1
+│   ├── 📄 deploy-internal-monitor.ps1
+│   ├── 📄 vm-internal-hibernation-monitor.ps1
+│   ├── 📄 proxy-point-helper.ps1    ← SSH key mgmt + tunnel-running detection
+│   ├── 📄 enable-proxy-point.ps1    ← PC-side: starts the reverse SSH SOCKS tunnel
+│   ├── 📄 disable-proxy-point.ps1   ← PC-side: stops the tunnel
+│   ├── 📄 vm-browser-via-proxy.ps1  ← VM-side: dedicated proxied browser profile
+│   ├── 📄 deploy-proxifyre.ps1      ← VM-side: one-time ProxiFyre install (Rivhit/Chrome/Edge)
+│   ├── 📄 vm-start-app-proxy.ps1    ← VM-side: toggle ProxiFyre ON
+│   └── 📄 vm-stop-app-proxy.ps1     ← VM-side: toggle ProxiFyre OFF
 └── 📂 internal/           ← Setup and docs
     ├── 📄 enable-hibernation.ps1
     └── 📄 *.md documentation
 ```
+VM-side desktop also has "Browser via Proxy Point", "Start App Proxy", and
+"Stop App Proxy" shortcuts (in the OneDrive-redirected Desktop folder — see
+`CLAUDE.md`).
 
 ### **What You See:**
 - **[`vm-rdp.ps1`](vm-rdp.ps1)** - **Only script you need to run!**
 - **[`config.json`](config.json)** - **All configuration in one place**
 - **[`README.md`](README.md)** - This usage guide
+- **[`CLAUDE.md`](CLAUDE.md)** - Architecture notes and gotchas for anyone (human or AI agent) changing this repo
 
 ### **Auto-Managed Scripts:**
 - **[`scripts/config-loader.ps1`](scripts/config-loader.ps1)** - Configuration loader
 - **[`scripts/update-scripts.ps1`](scripts/update-scripts.ps1)** - Handles git pull updates
 - **[`scripts/connect-vm-rdp.ps1`](scripts/connect-vm-rdp.ps1)** - RDP connection logic
 - **[`scripts/hibernation-monitor.ps1`](scripts/hibernation-monitor.ps1)** - Monitor process
+- **[`scripts/proxy-point-helper.ps1`](scripts/proxy-point-helper.ps1)**, **[`scripts/enable-proxy-point.ps1`](scripts/enable-proxy-point.ps1)**, **[`scripts/deploy-proxifyre.ps1`](scripts/deploy-proxifyre.ps1)**, **[`scripts/vm-start-app-proxy.ps1`](scripts/vm-start-app-proxy.ps1)** / **[`scripts/vm-stop-app-proxy.ps1`](scripts/vm-stop-app-proxy.ps1)** - see the [Proxy Point](#-proxy-point-vm-browser-exits-via-your-pc) section below
 
 ### **Setup & Documentation:**
 - **[`internal/enable-hibernation.ps1`](internal/enable-hibernation.ps1)** - Initial hibernation setup
