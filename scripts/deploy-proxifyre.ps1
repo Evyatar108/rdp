@@ -156,5 +156,5 @@ Write-Host ""
 Write-Host " ProxiFyre deployed." -ForegroundColor Green
 Write-Host "   Service: ProxiFyreService (Status: $($final.Status), StartType: $($final.StartType))" -ForegroundColor Gray
 Write-Host "   Config:  $InstallDir\app-config.json" -ForegroundColor Gray
-Write-Host "   Toggle with: scripts\vm-start-rivhit-proxy.ps1 / scripts\vm-stop-rivhit-proxy.ps1" -ForegroundColor Gray
-Write-Host "   (or the 'Start/Stop Rivhit via Proxy' desktop shortcuts)" -ForegroundColor Gray
+Write-Host "   Toggle with: scripts\vm-start-app-proxy.ps1 / scripts\vm-stop-app-proxy.ps1" -ForegroundColor Gray
+Write-Host "   (or the 'Start/Stop App Proxy' desktop shortcuts)" -ForegroundColor Gray
