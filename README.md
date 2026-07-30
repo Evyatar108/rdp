@@ -189,22 +189,27 @@ stop auto-starting it with RDP.
 - **Permission denied (publickey)** — key not deployed, wrong encoding (must be ASCII/UTF-8 no BOM), wrong ACL on `administrators_authorized_keys`, or the key was created with a passphrase
 - **Browser shows the Azure IP** — you launched a normal browser window instead of the shortcut; the proxy applies only to the dedicated profile
 
-### Proxying non-browser apps (any .exe) via ProxiFyre
+### Proxying Rivhit, Chrome, and Edge together via ProxiFyre
 
-The browser shortcut above only covers Chromium-based browsers (they support
-`--proxy-server` natively). To route a specific **other** program's traffic
-through the same Proxy Point tunnel — including apps with no proxy settings
-at all — this repo also supports [ProxiFyre](https://github.com/wiresock/proxifyre),
-a free/open-source Windows SOCKS5 "proxifier" that redirects a named process's
-traffic at the network-driver level, completely transparent to the app itself.
+Beyond the dedicated-profile browser shortcut above, this repo also supports
+[ProxiFyre](https://github.com/wiresock/proxifyre), a free/open-source
+Windows SOCKS5 "proxifier" that redirects a named process's traffic at the
+network-driver level — no proxy settings or special launch args needed on
+the app's part at all. This is used for a single unified toggle that covers
+**Rivhit + Chrome + Edge together**.
 
-**Currently configured for:** the entire `C:\Rivhit\` install folder (matched
-by path, not just `rivhit125.exe`) — this also covers helper/child processes
-Rivhit spawns under a different exe name (e.g. `icredit.exe`, `BatchEMV.exe`),
-since ProxiFyre matches by process name/path and does **not** follow
-parent→child relationships; same-named multiple instances of one exe are
-already covered automatically, but a differently-named child needs its own
-match, which is why the whole folder is targeted here.
+**Currently configured for:**
+- The entire `C:\Rivhit\` install folder (matched by path, not just
+  `rivhit125.exe`) — this also covers helper/child processes Rivhit spawns
+  under a different exe name (e.g. `icredit.exe`, `BatchEMV.exe`), since
+  ProxiFyre matches by process name/path and does **not** follow
+  parent→child relationships; same-named multiple instances of one exe are
+  already covered automatically, but a differently-named child needs its
+  own match, which is why the whole folder is targeted here.
+- `chrome.exe` and `msedge.exe` by name — this covers **every** window and
+  profile of those browsers, not just a dedicated one. That's a deliberate
+  choice: while the proxy is toggled on, all Chrome/Edge browsing on the VM
+  exits via your PC, not just a special profile.
 
 - **One-time setup (on the VM, elevated PowerShell):**
   `.\scripts\deploy-proxifyre.ps1`
@@ -216,15 +221,16 @@ match, which is why the whole folder is targeted here.
   out with no visible error (confirmed via live testing — this is the one
   non-obvious gotcha with this tool). The service is left **stopped,
   StartType=Manual** — it never starts on its own (not on boot, not tied to
-  Proxy Point's RDP auto-start) so it stays fully opt-in.
-- **To use it:** on the VM, double-click the **"Start Rivhit via Proxy"**
-  desktop shortcut (or run `.\scripts\vm-start-rivhit-proxy.ps1` elevated).
-  This starts `ProxiFyreService` and launches Rivhit — from then on, only
-  Rivhit's network traffic exits via your PC; everything else on the VM is
-  unaffected.
-- **To stop:** double-click **"Stop Rivhit Proxy"** (or run
-  `.\scripts\vm-stop-rivhit-proxy.ps1` elevated). This stops the service, so
-  Rivhit (after being restarted) reverts to normal VM/Azure egress.
+  Proxy Point's RDP auto-start) so it stays a deliberate, manual toggle.
+- **To use it:** on the VM, double-click the **"Start App Proxy"** desktop
+  shortcut (or run `.\scripts\vm-start-app-proxy.ps1` elevated). This starts
+  `ProxiFyreService` and launches/restarts Rivhit so it's captured from
+  launch. Chrome/Edge are **not** force-closed (to avoid losing open tabs) —
+  open a new tab/window (or close and reopen) so it routes through the proxy.
+- **To stop:** double-click **"Stop App Proxy"** (or run
+  `.\scripts\vm-stop-app-proxy.ps1` elevated). This stops the service and
+  closes Rivhit (restart it to resume normal VM/Azure egress); close and
+  reopen Chrome/Edge windows to fully return them to normal egress too.
 - **To proxy additional/different apps:** edit
   `C:\ProxiFyre\app-config.json` on the VM (add executable names or
   `"C:\\SomeFolder\\"`-style paths to `appNames`, or add another object to
@@ -235,6 +241,9 @@ match, which is why the whole folder is targeted here.
 - **Requires** the Proxy Point tunnel to already be running (same
   `localhost:1080` SOCKS proxy the browser shortcut uses) — both start/stop
   scripts check for it and fail fast with a clear message if it's down.
+- **Not automatic:** unlike the tunnel itself, this toggle is intentionally
+  **not** wired into `connect-vm-rdp.ps1`'s auto-start — nothing is proxied
+  until someone deliberately runs the "Start App Proxy" shortcut.
 
 ## 💰 Cost Savings
 

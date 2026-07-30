@@ -14,19 +14,22 @@
 #
 # The service is installed with StartType=Manual and left STOPPED - it never
 # starts on its own (not on boot, not tied to Proxy Point auto-start). Use
-# vm-start-rivhit-proxy.ps1 / vm-stop-rivhit-proxy.ps1 (or their desktop
+# vm-start-app-proxy.ps1 / vm-stop-app-proxy.ps1 (or their desktop
 # shortcuts) to toggle it on/off deliberately.
 #
 # NOTE on matching: ProxiFyre matches per-process by exe name/path - it does
 # NOT follow parent/child relationships. Multiple instances of the SAME exe
-# name (e.g. two rivhit125.exe windows) are already covered automatically.
-# A DIFFERENT child executable (Rivhit's folder has several: rivhit220.exe,
-# icredit.exe, BatchEMV.exe, dbeng12.exe, etc.) is only covered if matched too.
-# Rather than enumerating every helper exe by name, $TargetExeNames defaults
-# to a PATH-based pattern ("C:\Rivhit\") - any appNames entry containing a
-# backslash is matched as a substring of the process's full path, so this
-# covers every executable in that install folder, present or future,
-# regardless of which one Rivhit spawns as a child process.
+# name (e.g. two rivhit125.exe windows, or two chrome.exe windows/profiles)
+# are already covered automatically. A DIFFERENT child executable (Rivhit's
+# folder has several: rivhit220.exe, icredit.exe, BatchEMV.exe, dbeng12.exe,
+# etc.) is only covered if matched too. Rather than enumerating every helper
+# exe by name, $TargetExeNames defaults to a PATH-based pattern for Rivhit
+# ("C:\Rivhit\") - any appNames entry containing a backslash is matched as a
+# substring of the process's full path, so this covers every executable in
+# that install folder, present or future, regardless of which one Rivhit
+# spawns as a child process. Chrome and Edge are matched by exe name, which
+# covers ALL windows/profiles of that browser (not just a dedicated
+# profile) - by design, so the whole browser is proxied while this is on.
 #
 # To proxy additional/different apps later, edit C:\ProxiFyre\app-config.json
 # (add more entries to "appNames", or add another object to the "proxies"
@@ -35,7 +38,7 @@
 
 param(
     [string]$InstallDir = "C:\ProxiFyre",
-    [string[]]$TargetExeNames = @("C:\Rivhit\"),
+    [string[]]$TargetExeNames = @("C:\Rivhit\", "chrome.exe", "msedge.exe"),
     [int]$SocksPort = 1080,
     [string]$NdisapiVersion = "v3.6.2",
     [string]$NdisapiMsiName = "Windows.Packet.Filter.3.6.2.1.x64.msi",
