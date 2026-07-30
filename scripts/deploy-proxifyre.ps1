@@ -1,5 +1,5 @@
 # Deploy ProxiFyre (per-app SOCKS5 proxifier) - runs ON THE VM.
-# Installs the pieces needed to transparently route a SPECIFIC .exe's traffic
+# Installs the pieces needed to transparently route a SPECIFIC app's traffic
 # through the Proxy Point reverse SOCKS tunnel (localhost:1080), without that
 # app needing any native proxy support:
 #   1. VC++ 2022 x64 redistributable (ProxiFyre dependency)
@@ -13,6 +13,17 @@
 # vm-start-rivhit-proxy.ps1 / vm-stop-rivhit-proxy.ps1 (or their desktop
 # shortcuts) to toggle it on/off deliberately.
 #
+# NOTE on matching: ProxiFyre matches per-process by exe name/path - it does
+# NOT follow parent/child relationships. Multiple instances of the SAME exe
+# name (e.g. two rivhit125.exe windows) are already covered automatically.
+# A DIFFERENT child executable (Rivhit's folder has several: rivhit220.exe,
+# icredit.exe, BatchEMV.exe, dbeng12.exe, etc.) is only covered if matched too.
+# Rather than enumerating every helper exe by name, $TargetExeNames defaults
+# to a PATH-based pattern ("C:\Rivhit\") - any appNames entry containing a
+# backslash is matched as a substring of the process's full path, so this
+# covers every executable in that install folder, present or future,
+# regardless of which one Rivhit spawns as a child process.
+#
 # To proxy additional/different apps later, edit C:\ProxiFyre\app-config.json
 # (add more entries to "appNames", or add another object to the "proxies"
 # array for a different target/port) and restart the service - see
@@ -20,7 +31,7 @@
 
 param(
     [string]$InstallDir = "C:\ProxiFyre",
-    [string[]]$TargetExeNames = @("rivhit125.exe"),
+    [string[]]$TargetExeNames = @("C:\Rivhit\"),
     [int]$SocksPort = 1080,
     [string]$NdisapiVersion = "v3.6.2",
     [string]$NdisapiMsiName = "Windows.Packet.Filter.3.6.2.1.x64.msi",
