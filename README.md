@@ -36,6 +36,7 @@ This launcher script will:
 │   ├── 📄 disable-proxy-point.ps1   ← PC-side: stops the tunnel
 │   ├── 📄 vm-browser-via-proxy.ps1  ← VM-side: dedicated proxied browser profile
 │   ├── 📄 deploy-proxifyre.ps1      ← VM-side: one-time ProxiFyre install (Rivhit/Chrome/Edge)
+│   ├── 📄 deploy-vm-shortcuts.ps1   ← VM-side: recreates all proxy desktop shortcuts
 │   ├── 📄 vm-start-app-proxy.ps1    ← VM-side: toggle ProxiFyre ON
 │   └── 📄 vm-stop-app-proxy.ps1     ← VM-side: toggle ProxiFyre OFF
 └── 📂 internal/           ← Setup and docs
@@ -60,6 +61,7 @@ VM-side desktop also has "Browser via Proxy Point", "Start App Proxy", and
 - **[`scripts/proxy-point-helper.ps1`](scripts/proxy-point-helper.ps1)**, **[`scripts/enable-proxy-point.ps1`](scripts/enable-proxy-point.ps1)**, **[`scripts/deploy-proxifyre.ps1`](scripts/deploy-proxifyre.ps1)**, **[`scripts/vm-start-app-proxy.ps1`](scripts/vm-start-app-proxy.ps1)** / **[`scripts/vm-stop-app-proxy.ps1`](scripts/vm-stop-app-proxy.ps1)** - see the [Proxy Point](#-proxy-point-vm-browser-exits-via-your-pc) section below
 
 ### **Setup & Documentation:**
+- **[`internal/README.md`](internal/README.md)** - Index separating current runbooks from historical migration artifacts
 - **[`internal/enable-hibernation.ps1`](internal/enable-hibernation.ps1)** - Initial hibernation setup
 - **[`internal/*.md`](internal/)** - Detailed guides and documentation
 
@@ -141,12 +143,12 @@ All settings are managed through a single JSON configuration file: **[`config.js
 8. **Save money!** VM only charges for actual usage
 
 ### **Debug Mode:**
-- Set `$MONITOR_WINDOW_VISIBLE = $true` to see hibernation monitor
+- Set `hibernation.showMonitorWindow` to `true` in `config.json`
 - Window shows detailed progress and stays open for debugging
 - See exactly when RDP closes and countdown starts
 
 ### **Production Mode:**
-- Set `$MONITOR_WINDOW_VISIBLE = $false` for clean operation
+- Set `hibernation.showMonitorWindow` to `false` in `config.json`
 - Monitor runs hidden in background
 - Automatic hibernation with no visible windows
 
@@ -239,6 +241,8 @@ the app's part at all. This is used for a single unified toggle that covers
   non-obvious gotcha with this tool). The service is left **stopped,
   StartType=Manual** — it never starts on its own (not on boot, not tied to
   Proxy Point's RDP auto-start) so it stays a deliberate, manual toggle.
+  The deploy script also runs `deploy-vm-shortcuts.ps1` to recreate all
+  Proxy Point/App Proxy desktop shortcuts.
 - **To use it:** on the VM, double-click the **"Start App Proxy"** desktop
   shortcut (or run `.\scripts\vm-start-app-proxy.ps1` elevated). This starts
   `ProxiFyreService` and launches/restarts Rivhit so it's captured from
@@ -283,31 +287,37 @@ the app's part at all. This is used for a single unified toggle that covers
 1. **Azure CLI** installed and configured
 2. **Git** installed (for auto-updates)
 3. **PowerShell** execution policy allowing script execution
-4. **VM hibernation enabled** (run [`enable-hibernation.ps1`](enable-hibernation.ps1) first)
+4. **VM hibernation enabled** (run
+   [`internal/enable-hibernation.ps1`](internal/enable-hibernation.ps1) first)
 
 ## 🆘 Troubleshooting
 
 ### **VM Won't Hibernate:**
-- Check that hibernation is enabled: run [`enable-hibernation.ps1`](enable-hibernation.ps1)
+- Check that hibernation is enabled: run
+  [`internal/enable-hibernation.ps1`](internal/enable-hibernation.ps1)
 - Verify page file is on C: drive (not temp D: drive)
 - Ensure VM size supports hibernation (Dsv5, Esv5, etc.)
 
 ### **Monitor Not Working:**
-- Set `$MONITOR_WINDOW_VISIBLE = $true` to see debug output
-- Check that [`hibernation-monitor.ps1`](hibernation-monitor.ps1) exists in same directory
+- Set `hibernation.showMonitorWindow` to `true` in `config.json`
+- Check that
+  [`scripts/hibernation-monitor.ps1`](scripts/hibernation-monitor.ps1) exists
 - Verify Azure CLI authentication and permissions
 
 ### **Auto-Update Issues:**
 - Ensure you're in a git repository directory
 - Check git credentials and network connectivity
-- Set `$AUTO_UPDATE_ENABLED = $false` in [`scripts/update-scripts.ps1`](scripts/update-scripts.ps1)
+- Set `autoUpdate.enabled` to `false` in `config.json`
 
 ## 📚 Documentation
 
+- **[`internal/README.md`](internal/README.md)** - Documentation index (current vs. historical)
 - **[`internal/auto-hibernate-guide.md`](internal/auto-hibernate-guide.md)** - Detailed usage guide
 - **[`internal/hibernation-enablement-guide.md`](internal/hibernation-enablement-guide.md)** - Technical setup
 - **[`internal/hibernation-quick-reference.md`](internal/hibernation-quick-reference.md)** - Quick commands
 - **[`internal/fix-pagefile-hibernation.md`](internal/fix-pagefile-hibernation.md)** - Troubleshooting
+- **[`internal/proxy-point-operations.md`](internal/proxy-point-operations.md)** - Proxy Point/App Proxy behavior, verification, recovery, and troubleshooting
+- **[`internal/israel-region-migration-record.md`](internal/israel-region-migration-record.md)** - Durable record of the Germany-to-Israel migration and pending cleanup
 
 ---
 

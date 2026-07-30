@@ -81,7 +81,8 @@ Sharp edges (see repo `CLAUDE.md` for full detail):
 Any desktop shortcut must be written to
 `C:\Users\shabi108\OneDrive\Desktop`, not `C:\Users\shabi108\Desktop` (the
 latter is unused and shortcuts placed there are invisible to the user).
-Always `Test-Path` first to confirm.
+Always `Test-Path` first to confirm. Prefer the repo's idempotent
+`scripts/deploy-vm-shortcuts.ps1` instead of creating one-off shortcuts.
 
 ## Proxy Point (reverse SSH SOCKS tunnel)
 
@@ -99,6 +100,8 @@ Installed via `scripts/deploy-proxifyre.ps1`; toggled via
 App Proxy" desktop shortcuts). Currently covers Rivhit (`C:\Rivhit\`, whole
 folder so helper processes with different exe names are included) plus
 `chrome.exe` and `msedge.exe` (all windows/profiles of each browser).
+The deploy script also recreates the desktop shortcuts through
+`scripts/deploy-vm-shortcuts.ps1`.
 
 Critical gotchas:
 - **Service name is `ProxiFyreService`, not `ProxiFyre`.**
@@ -129,3 +132,13 @@ Verify proxied egress IP from the VM (through the tunnel):
 ```powershell
 az vm run-command invoke -g VM-RG-ISRAEL -n DesktopVM --command-id RunPowerShellScript --scripts "curl.exe -s --max-time 15 --socks5-hostname 127.0.0.1:1080 https://api.ipify.org" --query "value[0].message" -o tsv
 ```
+
+Detailed user-facing operations and recovery steps:
+`internal/proxy-point-operations.md`.
+
+Migration history and cleanup inventory:
+`internal/israel-region-migration-record.md`.
+
+Use `internal/README.md` to distinguish maintained runbooks from retired
+cross-tenant/Germany migration artifacts. Never run `internal/copy-vm.ps1`
+for the current VM.

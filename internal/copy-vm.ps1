@@ -1,3 +1,9 @@
+# HISTORICAL SCRIPT - DO NOT RUN AGAINST THE CURRENT VM.
+# This is the old cross-tenant/AzCopy migration flow and is intentionally
+# hardcoded to the retired Germany target. The current VM is selected through
+# repo-root config.json and lives in VM-RG-ISRAEL. See
+# internal/israel-region-migration-record.md and internal/README.md.
+
 $ErrorActionPreference = "Stop"
 
 # Check if azcopy is available before starting any operations
@@ -348,6 +354,3 @@ else {
         Write-Host "Data disk already attached to VM."
     }
 }
-
-
-  

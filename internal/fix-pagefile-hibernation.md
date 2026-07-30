@@ -1,5 +1,9 @@
 # 🛠️ Fix Page File for Hibernation
 
+This procedure applies to whichever VM is currently selected in the repo-root
+`config.json`. The original incident occurred on the retired Germany VM, so
+do not reuse the old `VM-RG-TARGET` identifier.
+
 ## ❌ **Current Issue**
 ```
 The Hibernate-Deallocate Operation cannot be performed on a VM that has extension 
@@ -17,8 +21,11 @@ Your VM's page file is currently on the **temporary disk (D: drive)** instead of
 
 ### Step 1: Connect to VM
 ```bash
-# Get public IP of VM
-az vm show -g VM-RG-TARGET -n DesktopVM -d --query publicIps -o tsv
+# From the repo root, resolve the current target
+$config = Get-Content .\config.json -Raw | ConvertFrom-Json
+$rg = $config.azure.target.resourceGroup
+$vm = $config.azure.target.vmName
+az vm show -g $rg -n $vm -d --query publicIps -o tsv
 
 # Connect via RDP using the public IP
 ```
@@ -66,18 +73,22 @@ Get-WmiObject -Class Win32_PageFileSetting | Select-Object Name, InitialSize, Ma
 ```
 
 ### Step 5: Re-test Hibernation (From Azure CLI)
-```bash
+```powershell
 # After page file is moved and VM restarted
-az vm deallocate -g VM-RG-TARGET -n DesktopVM --hibernate true
-az vm start -g VM-RG-TARGET -n DesktopVM
+$config = Get-Content .\config.json -Raw | ConvertFrom-Json
+$rg = $config.azure.target.resourceGroup
+$vm = $config.azure.target.vmName
+az vm deallocate -g $rg -n $vm --hibernate
+az vm start -g $rg -n $vm
 ```
 
-## 📋 **Updated Implementation Plan**
+## 📋 **Repair Sequence**
 
-1. ✅ **VM Size**: Already compatible (Dsv5-series)
-2. ✅ **Hibernation Enabled**: Already configured on VM
-3. ❌ **Page File Location**: **NEEDS FIX** - Move from D: to C:
-4. ⏳ **Test Hibernation**: After page file fix
+1. Confirm the current VM size supports hibernation.
+2. Move the page file from the temporary disk to the OS disk.
+3. Restart Windows.
+4. Run `.\internal\enable-hibernation.ps1` from the repo root.
+5. Verify state preservation after the test hibernate/resume cycle.
 
 ## 🚨 **Important Notes**
 
@@ -88,24 +99,24 @@ az vm start -g VM-RG-TARGET -n DesktopVM
 
 ## ⚡ **Quick Fix Commands**
 
-```bash
+```text
 # Connect to VM first, then run inside Windows:
 # 1. Open PowerShell as Administrator
 # 2. Run the PowerShell commands above
 # 3. Restart VM
-# 4. Test hibernation from Azure CLI
+# 4. Run internal\enable-hibernation.ps1 from the repo root
 ```
 
 ## 🔍 **Verification Steps**
 
 After fixing page file:
 1. **Check page file location**: Should be on C: drive only
-2. **Test hibernation**: `az vm deallocate -g VM-RG-TARGET -n DesktopVM --hibernate true`
-3. **Test resume**: `az vm start -g VM-RG-TARGET -n DesktopVM`
+2. **Test hibernation**: `az vm deallocate -g $rg -n $vm --hibernate`
+3. **Test resume**: `az vm start -g $rg -n $vm`
 4. **Verify state preservation**: Applications should resume exactly as left
 
 ## 📚 **References**
 
-- [Azure VM Hibernation Prerequisites](hibernation-doc.md:40-41)
+- [Maintained hibernation enablement guide](hibernation-enablement-guide.md)
 - [Windows Page File Configuration](https://docs.microsoft.com/windows/client-management/introduction-page-file)
 - [Azure Hibernation Troubleshooting](https://aka.ms/hibernate-resume/errors)

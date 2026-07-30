@@ -1,11 +1,12 @@
 $ErrorActionPreference = "Stop"
 
-# ----- TARGET (Tenant B) Configuration -----
-$TENANT_B = "66d51e14-99b9-435a-8c05-449dc0c91710"
-$SUB_B = "30748a75-b2b8-4e4f-b5df-e87aa4ceef7b"
-$RG_B = "VM-RG-TARGET"
-$VM_NAME = "DesktopVM"
-$OS_DISK_NAME = "DesktopVM-OS-Managed"
+# Load the current VM target from the repo's single source of truth.
+. (Join-Path $PSScriptRoot "..\scripts\config-loader.ps1")
+$config = Get-VMRdpConfig
+$TENANT_B = $config.azure.target.tenantId
+$SUB_B = $config.azure.target.subscriptionId
+$RG_B = $config.azure.target.resourceGroup
+$VM_NAME = $config.azure.target.vmName
 
 Write-Host "🛌 Starting VM Hibernation Enablement Process" -ForegroundColor Green
 Write-Host "=============================================" -ForegroundColor Green
@@ -56,7 +57,11 @@ if (-not $vmExists) {
 
 $currentHibernation = az vm show -g $RG_B -n $VM_NAME --query "additionalCapabilities.hibernationEnabled" -o tsv
 $vmSize = az vm show -g $RG_B -n $VM_NAME --query "hardwareProfile.vmSize" -o tsv
-$powerState = az vm show -g $RG_B -n $VM_NAME --query "instanceView.statuses[1].displayStatus" -o tsv
+$powerState = az vm show -g $RG_B -n $VM_NAME -d --query "powerState" -o tsv
+$OS_DISK_NAME = az vm show -g $RG_B -n $VM_NAME --query "storageProfile.osDisk.name" -o tsv
+if (-not $OS_DISK_NAME) {
+    Write-Error "Could not resolve the OS disk name for VM '$VM_NAME'."
+}
 
 Write-Host "VM Name: $VM_NAME" -ForegroundColor Cyan
 Write-Host "VM Size: $vmSize" -ForegroundColor Cyan
@@ -145,7 +150,7 @@ Write-Host "✅ VM started successfully" -ForegroundColor Green
 
 # Step 7: Verify hibernation configuration
 Write-Host "`n📋 Step 7: Verifying hibernation configuration..." -ForegroundColor Yellow
-$finalConfig = az vm show -g $RG_B -n $VM_NAME --query "{Name:name, HibernationEnabled:additionalCapabilities.hibernationEnabled, VMSize:hardwareProfile.vmSize, PowerState:instanceView.statuses[1].displayStatus}" -o json | ConvertFrom-Json
+$finalConfig = az vm show -g $RG_B -n $VM_NAME -d --query "{Name:name, HibernationEnabled:additionalCapabilities.hibernationEnabled, VMSize:hardwareProfile.vmSize, PowerState:powerState}" -o json | ConvertFrom-Json
 
 Write-Host "`n🔍 Final Configuration:" -ForegroundColor Green
 Write-Host "VM Name: $($finalConfig.Name)" -ForegroundColor Cyan
@@ -159,11 +164,11 @@ Write-Host "OS Disk Hibernation Support: $($diskConfig.SupportsHibernation)" -Fo
 # Step 8: Test hibernation functionality
 Write-Host "`n📋 Step 8: Testing hibernation functionality..." -ForegroundColor Yellow
 Write-Host "Hibernating VM..." -ForegroundColor Yellow
-az vm deallocate -g $RG_B -n $VM_NAME --hibernate true
+az vm deallocate -g $RG_B -n $VM_NAME --hibernate
 
 # Verify hibernation state
 Start-Sleep -Seconds 10
-$hibernatedState = az vm show -g $RG_B -n $VM_NAME --query "instanceView.statuses[1].displayStatus" -o tsv
+$hibernatedState = az vm show -g $RG_B -n $VM_NAME -d --query "powerState" -o tsv
 Write-Host "Hibernation state: $hibernatedState" -ForegroundColor Cyan
 
 Write-Host "Resuming VM from hibernation..." -ForegroundColor Yellow
@@ -172,7 +177,7 @@ az vm start -g $RG_B -n $VM_NAME
 # Wait for resume
 do {
     Start-Sleep -Seconds 10
-    $hibernatedState = az vm show -g $RG_B -n $VM_NAME -d --query "powerState" -o tsv
+    $resumeState = az vm show -g $RG_B -n $VM_NAME -d --query "powerState" -o tsv
     Write-Host "Resume state: $resumeState" -ForegroundColor Cyan
 } while ($resumeState -ne "VM running")
 

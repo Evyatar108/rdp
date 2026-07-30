@@ -1,91 +1,92 @@
-# 🛌 Auto-Hibernate on RDP Disconnect
+# Auto-Hibernation Operations
 
-## 🎯 **How It Works**
+The current hibernation behavior is controlled entirely by `config.json`.
+Do not edit constants inside the PowerShell scripts.
 
-The updated [`connect-vm-rdp.ps1`](connect-vm-rdp.ps1) script now includes automatic hibernation:
+## Current modes
 
-1. **Starts VM** if not running
-2. **Launches RDP** connection
-3. **Monitors RDP process** in the background
-4. **Detects when RDP window closes**
-5. **Waits 2 minutes** (grace period for reconnection)
-6. **Hibernates VM automatically**
+### Internal VM monitor
 
-## 🚀 **Usage**
+`hibernation.internal.enabled` controls the monitor that runs inside the VM
+and hibernates it after the configured period without an active RDP session.
 
-Simply run the connect script as usual:
-```powershell
-.\connect-vm-rdp.ps1
+Current defaults:
+
+```json
+{
+  "hibernation": {
+    "internal": {
+      "enabled": true,
+      "inactivityTimeoutMinutes": 60,
+      "checkIntervalSeconds": 60
+    }
+  }
+}
 ```
 
-**What happens:**
-- ✅ RDP window opens for your VM connection
-- 🔍 Script monitors the RDP process in background
-- 🔌 When you close the RDP window, countdown starts
-- ⏱️ 2-minute grace period (press Ctrl+C to cancel)
-- 🛌 VM hibernates automatically
-- 💰 **No compute charges** while hibernated
-
-## 🎛️ **User Control**
-
-- **Cancel hibernation**: Press `Ctrl+C` during the 2-minute countdown
-- **Reconnect**: Run the script again to resume and reconnect
-- **Manual hibernation**: Close PowerShell window to skip auto-hibernation
-
-## 💡 **Benefits**
-
-### Cost Optimization
-- **Automatic savings**: No more forgetting to hibernate
-- **Grace period**: 2 minutes to reconnect if needed
-- **Immediate**: Hibernation starts right after RDP closes
-
-### Convenience
-- **Single script**: Connect and auto-hibernate in one
-- **Smart detection**: Monitors actual RDP window, not just connections
-- **User control**: Easy to cancel if you need VM to stay running
-
-### State Preservation
-- **Exact resume**: All applications and data preserved
-- **Fast restart**: ~60 seconds to resume from hibernation
-- **Seamless workflow**: Pick up exactly where you left off
-
-## 🔄 **Workflow Example**
-
-1. **Run script**: `.\connect-vm-rdp.ps1`
-2. **VM starts**: If not already running
-3. **RDP opens**: Connect with username `***`
-4. **Work normally**: Use your VM as usual
-5. **Close RDP**: When finished, close the RDP window
-6. **Auto-countdown**: 2-minute timer starts automatically
-7. **VM hibernates**: Automatically saves state and stops compute charges
-8. **Next session**: Run script again to resume exactly where you left off
-
-## ⚙️ **Customization Options**
-
-Easy configuration at the top of [`connect-vm-rdp.ps1`](connect-vm-rdp.ps1):
+Deploy or repair it from an elevated PowerShell session on the VM:
 
 ```powershell
-# Auto-Hibernation Settings
-$HIBERNATION_DELAY_SECONDS = 120  # Change to your preferred delay (e.g., 300 for 5 minutes)
-$PROGRESS_UPDATE_INTERVAL = 1     # Update frequency for countdown display
+Set-Location C:\repos\rdp
+.\scripts\deploy-internal-monitor.ps1
 ```
 
-**Examples:**
-- **5 minutes delay**: `$HIBERNATION_DELAY_SECONDS = 300`
-- **30 seconds delay**: `$HIBERNATION_DELAY_SECONDS = 30`
-- **10 minutes delay**: `$HIBERNATION_DELAY_SECONDS = 600`
+### External RDP-process monitor
 
-## 🛡️ **Safety Features**
+`hibernation.external.enabled` controls the PC-side monitor launched by
+`scripts/connect-vm-rdp.ps1`. When enabled, it waits for the local RDP client
+process to close, then waits `hibernation.timing.delayAfterRdpCloseSeconds`
+before hibernating the VM.
 
-- **Grace period**: 2 minutes to reconnect before hibernation
-- **User cancellation**: Ctrl+C anytime during countdown
-- **Error handling**: Script handles connection failures gracefully
-- **Visual feedback**: Clear progress indicator and status messages
+It is currently disabled in `config.json`; the internal monitor is the active
+hibernation mechanism.
 
-## 📊 **Cost Impact**
+## Daily workflow
 
-**Before**: VM runs 24/7 = ~$50-100/month  
-**After**: VM hibernates when not in use = ~$10-20/month  
-**Savings**: Up to 80% reduction in compute costs!
+Run:
 
-Your VM will now automatically hibernate when you close the RDP connection, maximizing cost savings while preserving your exact work state!
+```powershell
+.\vm-rdp.ps1
+```
+
+The launcher updates the repo, starts/resumes the VM, starts Proxy Point when
+enabled, and opens RDP. Hibernation behavior then follows the two mode flags
+above.
+
+## Configuration
+
+```json
+{
+  "hibernation": {
+    "timing": {
+      "delayAfterRdpCloseSeconds": 300,
+      "progressUpdateIntervalSeconds": 1,
+      "hibernationResumeWaitSeconds": 60
+    },
+    "showMonitorWindow": true,
+    "external": {
+      "enabled": false,
+      "inactivityTimeoutMinutes": 60
+    },
+    "internal": {
+      "enabled": true,
+      "inactivityTimeoutMinutes": 60,
+      "checkIntervalSeconds": 60
+    }
+  }
+}
+```
+
+Set only one mechanism as authoritative unless you intentionally want both.
+If both are enabled, either monitor may hibernate the VM first.
+
+## Troubleshooting
+
+- Verify current settings in `config.json`.
+- Check the internal scheduled task:
+  `Get-ScheduledTask -TaskName VMHibernationMonitor`.
+- Review `C:\VMHibernation\hibernation-monitor.log`.
+- Set `hibernation.showMonitorWindow` to `true` when debugging the external
+  monitor.
+- Confirm the VM and OS disk support hibernation with
+  `internal\enable-hibernation.ps1`.

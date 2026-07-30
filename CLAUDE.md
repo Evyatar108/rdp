@@ -79,6 +79,8 @@ Desktop shortcuts **must** be created in
 `C:\Users\shabi108\OneDrive\Desktop`, **not** `C:\Users\shabi108\Desktop` —
 the latter is the wrong, unused folder on this VM. A shortcut placed there
 silently doesn't show up. Always verify with `Test-Path` before writing.
+Use `scripts/deploy-vm-shortcuts.ps1` instead of one-off shortcut scripts so
+the VM desktop state remains reproducible from the repo.
 
 ## PowerShell `Start-Process -ArgumentList` quoting
 
@@ -140,6 +142,16 @@ without needing browser-specific proxy flags. Non-obvious pitfalls:
 - New processes (or new tabs/reconnects in already-open ones) after the
   service starts are what get captured; already-established connections
   made before the driver attached will not retroactively be proxied.
+
+User-facing operating/recovery instructions live in
+`internal/proxy-point-operations.md`. The completed regional cutover and
+pending cleanup inventory are recorded in
+`internal/israel-region-migration-record.md`.
+
+The `internal` folder also contains historical migration artifacts. Read
+`internal/README.md` before using anything there; in particular,
+`internal/copy-vm.ps1` is the retired cross-tenant/Germany flow and must not
+be used for the current VM.
 
 ## Known pending cleanup (not yet actioned — needs explicit user go-ahead)
 

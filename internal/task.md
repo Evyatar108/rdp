@@ -1,5 +1,10 @@
 # 📝 Goal: Copy a VM Across Tenants to Apply a Subscription Discount
 
+> **Historical record:** this describes the earlier cross-tenant subscription
+> copy, not the later Germany-to-Israel regional cutover and not the current
+> VM target. Do not use its identifiers as current configuration. See
+> `internal/israel-region-migration-record.md` and repo-root `config.json`.
+
 ## 🎯 Objective
 We have a VM running in **Subscription A (Tenant A)**.  
 Our Azure discount applies only to **Subscription B (Tenant B)**.  

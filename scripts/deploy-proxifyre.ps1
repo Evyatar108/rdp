@@ -158,3 +158,13 @@ Write-Host "   Service: ProxiFyreService (Status: $($final.Status), StartType: $
 Write-Host "   Config:  $InstallDir\app-config.json" -ForegroundColor Gray
 Write-Host "   Toggle with: scripts\vm-start-app-proxy.ps1 / scripts\vm-stop-app-proxy.ps1" -ForegroundColor Gray
 Write-Host "   (or the 'Start/Stop App Proxy' desktop shortcuts)" -ForegroundColor Gray
+
+$shortcutDeployScript = Join-Path $PSScriptRoot "deploy-vm-shortcuts.ps1"
+if (Test-Path $shortcutDeployScript) {
+    Write-Host ""
+    Write-Host " Deploying VM desktop shortcuts..." -ForegroundColor Yellow
+    & $shortcutDeployScript
+}
+else {
+    throw "Shortcut deployment script not found: $shortcutDeployScript"
+}

@@ -13,6 +13,12 @@ ms.custom: devx-track-azurecli, devx-track-azurepowershell
 
 # Hibernating Windows virtual machines
 
+> **Archived reference snapshot:** this file was copied from Microsoft Learn
+> in 2024 and retains documentation-build includes/relative links that do not
+> resolve inside this repo. It is not the current project runbook. Use
+> `internal/hibernation-enablement-guide.md` and
+> `internal/hibernation-quick-reference.md` for maintained instructions.
+
 **Applies to:** :heavy_check_mark: Windows VMs
 
 [!INCLUDE [hibernate-resume-intro](../includes/hibernate-resume-intro.md)]
