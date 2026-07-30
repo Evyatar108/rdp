@@ -6,6 +6,11 @@ file captures non-obvious gotchas discovered while building/debugging the
 system, so future sessions (human or AI) don't have to rediscover them the
 hard way.
 
+> A Copilot CLI agent skill covering the same operational knowledge in
+> quick-reference form lives at
+> [`.github/skills/azure-vm-rdp-ops/SKILL.md`](.github/skills/azure-vm-rdp-ops/SKILL.md) —
+> keep both in sync when things change here.
+
 ## Environment identifiers (current, as of this writing)
 
 - **VM:** `DesktopVM`, resource group `VM-RG-ISRAEL`, region **Israel Central**
