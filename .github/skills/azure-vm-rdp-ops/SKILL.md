@@ -116,8 +116,11 @@ Critical gotchas:
   error anywhere. `deploy-proxifyre.ps1` adds these automatically — don't
   skip this if reinstalling manually.
 - Service is deliberately `StartType=Manual` and left stopped after
-  install/deploy — app-level proxying here is opt-in by design, unlike the
-  tunnel which auto-starts.
+  install/deploy, so Windows boot never starts it implicitly.
+- `proxyPoint.appProxyMode` controls runtime behavior: `automatic` starts the
+  service after the owning tunnel is ready and stops it on matching release;
+  `manual` leaves it under the Start/Stop App Proxy shortcuts. The repo
+  currently defaults to `automatic`.
 - Matches by process name/path, not parent→child relationship — a
   same-named process is covered automatically, a differently-named child
   process needs its own `appNames` entry (or a path-based folder match).

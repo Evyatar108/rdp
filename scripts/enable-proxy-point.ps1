@@ -29,6 +29,10 @@ $SOCKS_PORT = $config.proxyPoint.socksPort
 $SSH_USER = $config.proxyPoint.sshUser
 $AUTO_RECONNECT = $config.proxyPoint.autoReconnect
 $RECONNECT_DELAY = $config.proxyPoint.reconnectDelaySeconds
+$APP_PROXY_MODE = [string]$config.proxyPoint.appProxyMode
+if ($APP_PROXY_MODE -notin @("manual", "automatic")) {
+    throw "Unsupported proxyPoint.appProxyMode '$APP_PROXY_MODE'. Expected 'manual' or 'automatic'."
+}
 
 . (Join-Path $PSScriptRoot "proxy-point-helper.ps1")
 $SSH_KEY = Get-ProxyPointKeyPath -Config $config
@@ -57,6 +61,7 @@ if (-not $publicIP) { Write-Error "No public IP found for VM." }
 
 Write-Host " VM: $publicIP | SOCKS on VM: localhost:$SOCKS_PORT | Exit: this PC" -ForegroundColor Cyan
 Write-Host " Ownership: latest connection wins ($env:COMPUTERNAME)" -ForegroundColor Cyan
+Write-Host " App Proxy mode: $APP_PROXY_MODE" -ForegroundColor Cyan
 Write-Host " Press Ctrl+C to stop the proxy point." -ForegroundColor Yellow
 Write-Host ""
 
@@ -78,6 +83,8 @@ $sshArgs = @(
 )
 
 try {
+    $appProxyAutomaticApplied = $false
+    $nextAppProxyAttempt = Get-Date
     while ($true) {
         Write-Host "$(Get-Date -Format 'HH:mm:ss') Establishing tunnel..." -ForegroundColor Cyan
         $sshProcess = Start-Process "ssh.exe" -ArgumentList $sshArgs -NoNewWindow -PassThru
@@ -93,6 +100,26 @@ try {
                     $ownershipLost = $true
                     Stop-Process -Id $sshProcess.Id -Force -ErrorAction SilentlyContinue
                     break
+                }
+                if (
+                    $APP_PROXY_MODE -eq "automatic" -and
+                    $status.Listening -and
+                    -not $appProxyAutomaticApplied -and
+                    (Get-Date) -ge $nextAppProxyAttempt
+                ) {
+                    try {
+                        Set-ProxyPointAppProxyState `
+                            -Config $config `
+                            -PublicIP $publicIP `
+                            -OwnerToken $OwnerToken `
+                            -Enabled $true | Out-Null
+                        $appProxyAutomaticApplied = $true
+                        Write-Host " App Proxy enabled automatically for Rivhit, Chrome, and Edge." -ForegroundColor Green
+                    }
+                    catch {
+                        Write-Host " Automatic App Proxy start failed: $($_.Exception.Message)" -ForegroundColor Yellow
+                        $nextAppProxyAttempt = (Get-Date).AddSeconds(10)
+                    }
                 }
             }
             catch {

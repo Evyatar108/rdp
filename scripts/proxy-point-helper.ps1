@@ -88,6 +88,7 @@ function Claim-ProxyPointOwnership {
     $token = $OwnerToken.Replace("'", "''")
     $computerName = $env:COMPUTERNAME.Replace("'", "''")
     $userName = $env:USERNAME.Replace("'", "''")
+    $appProxyMode = ([string]$Config.proxyPoint.appProxyMode).Replace("'", "''")
     $remoteScript = @"
 `$ErrorActionPreference = 'Stop'
 `$stateDirectory = 'C:\ProgramData\RdpProxyPoint'
@@ -104,10 +105,23 @@ for (`$i = 0; `$i -lt 120 -and -not `$lockStream; `$i++) {
 }
 if (-not `$lockStream) { throw 'Timed out waiting for the Proxy Point ownership lock.' }
 try {
+    `$previousState = `$null
+    if (Test-Path `$statePath) {
+        try { `$previousState = Get-Content `$statePath -Raw | ConvertFrom-Json } catch {}
+    }
+    if (`$previousState -and `$previousState.appProxyMode -eq 'automatic') {
+        `$previousAppProxy = Get-Service -Name 'ProxiFyreService' -ErrorAction SilentlyContinue
+        if (`$previousAppProxy -and `$previousAppProxy.Status -ne 'Stopped') {
+            Stop-Service -Name 'ProxiFyreService' -Force
+            `$previousAppProxy.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(15))
+        }
+    }
+
     [ordered]@{
         ownerToken = '$token'
         computerName = '$computerName'
         userName = '$userName'
+        appProxyMode = '$appProxyMode'
         claimedAt = (Get-Date).ToUniversalTime().ToString('o')
     } | ConvertTo-Json | Set-Content -Path `$statePath -Encoding ASCII
 
@@ -245,6 +259,101 @@ function Wait-ProxyPointReady {
     throw "Proxy Point did not become ready on VM localhost:$($Config.proxyPoint.socksPort) within $TimeoutSeconds seconds."
 }
 
+function Set-ProxyPointAppProxyState {
+    param(
+        $Config,
+        [string]$PublicIP,
+        [string]$OwnerToken,
+        [bool]$Enabled
+    )
+
+    $desiredState = if ($Enabled) { "running" } else { "stopped" }
+    $enabledLiteral = if ($Enabled) { '$true' } else { '$false' }
+    $port = [int]$Config.proxyPoint.socksPort
+    $token = $OwnerToken.Replace("'", "''")
+    $remoteScript = @"
+`$ErrorActionPreference = 'Stop'
+`$stateDirectory = 'C:\ProgramData\RdpProxyPoint'
+`$statePath = Join-Path `$stateDirectory 'owner.json'
+`$lockPath = Join-Path `$stateDirectory 'ownership.lock'
+New-Item -ItemType Directory -Path `$stateDirectory -Force | Out-Null
+`$lockStream = `$null
+for (`$i = 0; `$i -lt 120 -and -not `$lockStream; `$i++) {
+    try {
+        `$lockStream = [IO.File]::Open(`$lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    } catch [IO.IOException] {
+        Start-Sleep -Milliseconds 250
+    }
+}
+if (-not `$lockStream) { throw 'Timed out waiting for the Proxy Point ownership lock.' }
+try {
+    if (-not (Test-Path `$statePath)) {
+        Write-Output 'proxy-app:no-owner'
+        exit 0
+    }
+    try {
+        `$state = Get-Content `$statePath -Raw | ConvertFrom-Json
+    } catch {
+        Write-Output 'proxy-app:invalid-state'
+        exit 0
+    }
+    if (`$state.ownerToken -ne '$token') {
+        Write-Output 'proxy-app:not-owner'
+        exit 0
+    }
+    if ($enabledLiteral -and `$state.appProxyMode -ne 'automatic') {
+        Write-Output 'proxy-app:manual-mode'
+        exit 0
+    }
+    if ($enabledLiteral -and -not (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)) {
+        Write-Output 'proxy-app:no-listener'
+        exit 0
+    }
+
+    `$service = Get-Service -Name 'ProxiFyreService' -ErrorAction SilentlyContinue
+    if (-not `$service) {
+        Write-Output 'proxy-app:missing'
+        exit 0
+    }
+    if ($enabledLiteral) {
+        if (`$service.Status -ne 'Running') {
+            Start-Service -Name 'ProxiFyreService'
+            `$service.WaitForStatus('Running', [TimeSpan]::FromSeconds(15))
+        }
+        Write-Output 'proxy-app:running'
+    }
+    else {
+        if (`$service.Status -ne 'Stopped') {
+            Stop-Service -Name 'ProxiFyreService' -Force
+            `$service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(15))
+        }
+        Write-Output 'proxy-app:stopped'
+    }
+}
+finally {
+    `$lockStream.Dispose()
+}
+"@
+
+    $result = Invoke-ProxyPointRemoteScript -Config $Config -PublicIP $PublicIP -Script $remoteScript
+    if ($result -match 'proxy-app:missing') {
+        throw "ProxiFyreService is not installed on the VM. Run scripts\deploy-proxifyre.ps1 on the VM."
+    }
+    if ($result -match 'proxy-app:(not-owner|no-owner)') {
+        throw "This PC no longer owns Proxy Point."
+    }
+    if ($result -match 'proxy-app:no-listener') {
+        throw "The owning Proxy Point listener is not ready."
+    }
+    if ($result -match 'proxy-app:manual-mode') {
+        throw "App Proxy is configured for manual mode."
+    }
+    if ($result -notmatch "proxy-app:$desiredState") {
+        throw "VM did not confirm App Proxy state '$desiredState': $result"
+    }
+    return $desiredState
+}
+
 function Release-ProxyPointOwnership {
     param(
         $Config,
@@ -283,12 +392,19 @@ try {
         Write-Output 'proxy-release:not-owner'
         exit 0
     }
-    Remove-Item `$statePath -Force -ErrorAction SilentlyContinue
     `$listenerPids = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
         Select-Object -ExpandProperty OwningProcess -Unique
     foreach (`$listenerPid in `$listenerPids) {
         Stop-Process -Id `$listenerPid -Force -ErrorAction SilentlyContinue
     }
+    if (`$state.appProxyMode -eq 'automatic') {
+        `$appProxyService = Get-Service -Name 'ProxiFyreService' -ErrorAction SilentlyContinue
+        if (`$appProxyService -and `$appProxyService.Status -ne 'Stopped') {
+            Stop-Service -Name 'ProxiFyreService' -Force
+            `$appProxyService.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(15))
+        }
+    }
+    Remove-Item `$statePath -Force -ErrorAction SilentlyContinue
     Write-Output 'proxy-release:released'
 }
 finally {

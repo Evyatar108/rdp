@@ -12,10 +12,10 @@
 #   - chrome.exe  - ALL Chrome windows/profiles, not just a dedicated one
 #   - msedge.exe  - ALL Edge windows/profiles
 #
-# The ProxiFyre service is intentionally left on Manual startup (never
-# starts on its own / on boot, and not tied to Proxy Point's RDP auto-start)
-# - only this script (or vm-stop-app-proxy.ps1) toggles it, per design choice
-# to keep app-level proxying fully opt-in.
+# The Windows service itself remains StartType=Manual (never starts on boot).
+# Whether the RDP/Proxy Point workflow starts and stops it automatically is
+# controlled by config.json -> proxyPoint.appProxyMode. This shortcut remains
+# available as a per-session manual override and also launches/restarts Rivhit.
 
 param(
     [int]$SocksPort = 1080,

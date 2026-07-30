@@ -93,6 +93,7 @@ function Get-VMRdpConfig {
                 reconnectDelaySeconds = 5
                 ownershipMode = "latestWins"
                 releaseOnRdpClose = $true
+                appProxyMode = "automatic"
             })
         }
         else {
@@ -105,6 +106,7 @@ function Get-VMRdpConfig {
                 reconnectDelaySeconds = 5
                 ownershipMode = "latestWins"
                 releaseOnRdpClose = $true
+                appProxyMode = "automatic"
             }
             foreach ($field in $proxyPointDefaults.Keys) {
                 if (-not (Get-Member -InputObject $config.proxyPoint -Name $field -MemberType Properties)) {

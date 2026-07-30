@@ -125,11 +125,12 @@ without needing browser-specific proxy flags. Non-obvious pitfalls:
   `ProxiFyre`** (the exe's name). `Get-Service -Name ProxiFyre` finds
   nothing; use `ProxiFyreService`.
 - **`ProxiFyre.exe install` defaults the service to `StartType=Automatic`.**
-  We deliberately force it to `Manual` (`sc.exe config ProxiFyreService
-  start= demand`) so it never starts on its own — this repo's design intent
-  is for app-level proxying to be a conscious, opt-in toggle
-  (`vm-start-app-proxy.ps1` / `vm-stop-app-proxy.ps1`), separate from the
-  tunnel itself which does auto-start.
+  We deliberately force the Windows service to `Manual` (`sc.exe config
+  ProxiFyreService start= demand`) so Windows boot never starts it by itself.
+  Runtime behavior is selected by `proxyPoint.appProxyMode`: `automatic`
+  starts it once the owning tunnel is ready and stops it on token-matched
+  release; `manual` leaves it under `vm-start-app-proxy.ps1` /
+  `vm-stop-app-proxy.ps1` control.
 - **Windows Firewall silently breaks it if you don't add allow rules for
   `ProxiFyre.exe`.** Symptom: the driver correctly intercepts a matched
   process's traffic, but the redirected connection just hangs/times out

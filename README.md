@@ -172,6 +172,8 @@ proxy (with proxy-side DNS); everything else on the VM (including RDP) is unaffe
 3. Claims Proxy Point ownership for this PC (**latest connection wins**)
 4. Replaces any older PC's tunnel and starts this PC's tunnel minimized
 5. Releases this PC's ownership automatically when its RDP window closes
+6. Starts/stops transparent Rivhit/Chrome/Edge proxying according to
+   `proxyPoint.appProxyMode`
 
 If another PC runs `vm-rdp.ps1` while this session is open, that newer PC takes
 over Proxy Point automatically. The older RDP session remains connected, but
@@ -203,10 +205,21 @@ stop auto-starting it with RDP.
     "autoReconnect": true,
     "reconnectDelaySeconds": 5,
     "ownershipMode": "latestWins",
-    "releaseOnRdpClose": true
+    "releaseOnRdpClose": true,
+    "appProxyMode": "automatic"
   }
 }
 ```
+
+`appProxyMode` accepts:
+
+- `"automatic"` (current default): start `ProxiFyreService` when the owning
+  tunnel becomes ready and stop it when that owner releases the tunnel.
+- `"manual"`: leave `ProxiFyreService` under the **Start App Proxy** /
+  **Stop App Proxy** shortcuts' control.
+
+Set `proxyPoint.enabled` to `false` to disable automatic tunnel setup entirely.
+Configuration changes apply on the next `vm-rdp.ps1`/Proxy Point launch.
 
 ### VM-side setup (already done for the current VM)
 - OpenSSH Server installed + running on the VM, firewall + NSG allow port 22
@@ -249,12 +262,13 @@ the app's part at all. This is used for a single unified toggle that covers
   those rules the driver still intercepts matched processes' traffic, but
   ProxiFyre's own relay connection to the SOCKS endpoint silently hangs/times
   out with no visible error (confirmed via live testing — this is the one
-  non-obvious gotcha with this tool). The service is left **stopped,
-  StartType=Manual** — it never starts on its own (not on boot, not tied to
-  Proxy Point's RDP auto-start) so it stays a deliberate, manual toggle.
+  non-obvious gotcha with this tool). The Windows service remains
+  **StartType=Manual**, so it never starts merely because Windows boots.
+  `proxyPoint.appProxyMode` controls whether the Proxy Point workflow starts
+  and stops it automatically or leaves it under shortcut control.
   The deploy script also runs `deploy-vm-shortcuts.ps1` to recreate all
   Proxy Point/App Proxy desktop shortcuts.
-- **To use it:** on the VM, double-click the **"Start App Proxy"** desktop
+- **Manual use/override:** on the VM, double-click the **"Start App Proxy"** desktop
   shortcut (or run `.\scripts\vm-start-app-proxy.ps1` elevated). This starts
   `ProxiFyreService` and launches/restarts Rivhit so it's captured from
   launch. Chrome/Edge are **not** force-closed (to avoid losing open tabs) —
@@ -273,9 +287,10 @@ the app's part at all. This is used for a single unified toggle that covers
 - **Requires** the Proxy Point tunnel to already be running (same
   `localhost:1080` SOCKS proxy the browser shortcut uses) — both start/stop
   scripts check for it and fail fast with a clear message if it's down.
-- **Not automatic:** unlike the tunnel itself, this toggle is intentionally
-  **not** wired into `connect-vm-rdp.ps1`'s auto-start — nothing is proxied
-  until someone deliberately runs the "Start App Proxy" shortcut.
+- With `appProxyMode: "automatic"`, the service follows the owning tunnel's
+  lifetime. With `"manual"`, nothing is transparently proxied until someone
+  runs **Start App Proxy**. The shortcuts remain available in both modes as
+  per-session overrides.
 
 ## 💰 Cost Savings
 

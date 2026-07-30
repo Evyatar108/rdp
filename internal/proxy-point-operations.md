@@ -16,6 +16,8 @@ Running `.\vm-rdp.ps1` on a connecting PC:
    tunnel in a minimized PowerShell window.
 6. Opens RDP.
 7. Releases this PC's lease and tunnel when its local RDP window closes.
+8. Starts/stops transparent application proxying according to
+   `proxyPoint.appProxyMode`.
 
 The tunnel exposes `127.0.0.1:1080` on the VM, but the tunnel alone does not
 route any application through it.
@@ -41,9 +43,32 @@ cannot both provide egress at once. When the newest owner's RDP window closes,
 the tunnel is released. An older still-open RDP session is not automatically
 restored; rerun `vm-rdp.ps1` on that PC to reclaim ownership.
 
-## What remains manual
+## App Proxy mode
 
-Application-level proxying is intentionally opt-in.
+`config.json` controls transparent Rivhit/Chrome/Edge proxying independently
+from tunnel creation:
+
+```json
+{
+  "proxyPoint": {
+    "enabled": true,
+    "appProxyMode": "automatic"
+  }
+}
+```
+
+- `"automatic"` (current default): `ProxiFyreService` starts after the current
+  owner's SOCKS listener is confirmed ready. The matching owner release stops
+  the service. A stale/older owner cannot stop a newer owner's service/tunnel.
+- `"manual"`: the tunnel still starts automatically, but users control
+  `ProxiFyreService` through **Start App Proxy** and **Stop App Proxy**.
+- `proxyPoint.enabled: false`: no automatic tunnel or App Proxy lifecycle.
+
+The Windows service remains `StartType=Manual` in both modes; automatic mode
+means the Proxy Point scripts start it, not Windows boot. Changes apply on the
+next Proxy Point launch.
+
+## Manual shortcuts and overrides
 
 - **Browser via Proxy Point** launches a dedicated Chrome/Edge profile with
   explicit SOCKS5 arguments. Normal browser windows are unaffected.
@@ -52,6 +77,10 @@ Application-level proxying is intentionally opt-in.
   - all `chrome.exe` processes
   - all `msedge.exe` processes
 - **Stop App Proxy** stops transparent routing.
+
+The App Proxy shortcuts remain usable in automatic mode as per-session
+overrides. If manually stopped, automatic mode starts it again on the next
+successful ownership claim.
 
 Chrome and Edge are not force-closed when the proxy is toggled because doing
 so could lose tabs or unsaved form data. Open a new tab/window or restart the
@@ -69,7 +98,8 @@ The result should be the connecting PC's public IP, not the Azure VM's IP.
 
 ## Verify transparent App Proxy routing
 
-1. Use **Start App Proxy** on the VM.
+1. Confirm `ProxiFyreService` is running (automatic mode) or use
+   **Start App Proxy** (manual mode).
 2. Open a new Chrome or Edge window.
 3. Visit `https://api.ipify.org?format=json`.
 4. Confirm the shown IP is the connecting PC's public IP.
@@ -96,7 +126,8 @@ Set-Location C:\repos\rdp
 - ProxiFyre binaries and `ProxiFyreService`
 - `C:\ProxiFyre\app-config.json`
 - required inbound and outbound firewall rules for `ProxiFyre.exe`
-- manual/stopped service startup policy
+- Windows service `StartType=Manual` policy (lifecycle still follows
+  `appProxyMode`)
 
 `deploy-vm-shortcuts.ps1` recreates all three shortcuts in the correct desktop
 folder. The current VM redirects the desktop to
@@ -155,6 +186,7 @@ This does not indicate an interactive RDP-session or ProxiFyre failure.
   `disable-proxy-point.ps1` is run.
 - Each connecting PC receives its own SSH key, appended to the VM's
   administrators authorized-keys file.
-- `ProxiFyreService` is intentionally manual and stopped by default.
+- `ProxiFyreService` is `StartType=Manual`; its session lifecycle is selected
+  by `proxyPoint.appProxyMode`.
 - Proxy Point affects only explicitly configured applications; RDP itself is
   not routed through the SOCKS tunnel.

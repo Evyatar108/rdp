@@ -125,7 +125,23 @@ if ($config.proxyPoint.enabled) {
 
         Write-Host " Proxy point tunnel ready; this PC is the current owner" -ForegroundColor Green
         Write-Host "   A later PC connection will take over automatically" -ForegroundColor Gray
-        Write-Host "   Use 'Start App Proxy' on the VM for Rivhit/Chrome/Edge" -ForegroundColor Gray
+        if ($config.proxyPoint.appProxyMode -eq "automatic") {
+            try {
+                Set-ProxyPointAppProxyState `
+                    -Config $config `
+                    -PublicIP $publicIP `
+                    -OwnerToken $proxyOwnerToken `
+                    -Enabled $true | Out-Null
+                Write-Host " App Proxy enabled automatically for Rivhit, Chrome, and Edge" -ForegroundColor Green
+            }
+            catch {
+                Write-Host " App Proxy automatic start failed: $($_.Exception.Message)" -ForegroundColor Yellow
+                Write-Host "   Tunnel remains available; use 'Start App Proxy' after fixing ProxiFyre" -ForegroundColor Gray
+            }
+        }
+        else {
+            Write-Host "   App Proxy is manual; use 'Start App Proxy' on the VM" -ForegroundColor Gray
+        }
     }
     catch {
         if ($proxyOwnerToken) {

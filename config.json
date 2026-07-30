@@ -16,7 +16,8 @@
     "autoReconnect": true,
     "reconnectDelaySeconds": 5,
     "ownershipMode": "latestWins",
-    "releaseOnRdpClose": true
+    "releaseOnRdpClose": true,
+    "appProxyMode": "automatic"
   },
   "hibernation": {
     "timing": {

@@ -3,6 +3,8 @@
 # egress. Closes Rivhit first so it restarts cleanly outside the proxy next
 # time. Chrome/Edge are NOT force-closed (avoid losing open tabs) - close and
 # reopen them yourself to fully return their traffic to normal VM egress.
+# In automatic appProxyMode this is a per-session override; the next successful
+# RDP/Proxy Point ownership claim starts the service again.
 
 param(
     [string]$ServiceName = "ProxiFyreService",
