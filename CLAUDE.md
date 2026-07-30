@@ -107,6 +107,15 @@ the PC's own network. `scripts/connect-vm-rdp.ps1` auto-starts this tunnel
 starting the tunnel does **not**, by itself, make anything use it (see next
 section).
 
+Multi-PC ownership is tokenized and **latest connection wins**. Claim/release
+operations use a VM-side exclusive file lock under
+`C:\ProgramData\RdpProxyPoint`; the current token is stored in `owner.json`.
+The old tunnel wrapper actively polls ownership while SSH is running, so it
+exits after takeover instead of reclaiming the port. RDP-close release is
+token-checked, preventing an old monitor from killing a newer tunnel. There is
+no automatic fallback to an older still-open RDP session after the newest
+owner disconnects; that PC must rerun `vm-rdp.ps1`.
+
 ## ProxiFyre (per-app / per-folder transparent proxying)
 
 Used to route Rivhit + Chrome + Edge traffic through the Proxy Point tunnel

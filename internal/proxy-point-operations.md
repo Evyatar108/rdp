@@ -11,11 +11,35 @@ Running `.\vm-rdp.ps1` on a connecting PC:
 1. Pulls the latest repo changes when auto-update is enabled.
 2. Starts/resumes the Azure VM.
 3. Creates and authorizes a per-PC SSH key on first use.
-4. Starts a reverse SSH SOCKS5 tunnel in a minimized PowerShell window.
-5. Opens RDP.
+4. Claims a tokenized VM-side ownership lease.
+5. Stops any older PC's listener and starts this PC's reverse SSH SOCKS5
+   tunnel in a minimized PowerShell window.
+6. Opens RDP.
+7. Releases this PC's lease and tunnel when its local RDP window closes.
 
 The tunnel exposes `127.0.0.1:1080` on the VM, but the tunnel alone does not
 route any application through it.
+
+## Multiple connecting PCs
+
+Proxy Point uses `ownershipMode: "latestWins"`:
+
+- The newest PC that successfully runs `vm-rdp.ps1` becomes the owner.
+- Claim/release operations are serialized on the VM with an ownership lock.
+- A per-connection random token prevents an older RDP-close monitor from
+  removing a newer PC's tunnel.
+- The older PC's SSH reconnect loop detects the token change and exits.
+- Existing RDP sessions are not disconnected; only Proxy Point ownership
+  changes.
+
+VM ownership state is stored under `C:\ProgramData\RdpProxyPoint`. Each PC
+also keeps its current token under `%LOCALAPPDATA%\RdpProxyPoint` so
+`disable-proxy-point.ps1` can release only that PC's lease.
+
+Only one shared VM endpoint (`127.0.0.1:1080`) exists, so simultaneous PCs
+cannot both provide egress at once. When the newest owner's RDP window closes,
+the tunnel is released. An older still-open RDP session is not automatically
+restored; rerun `vm-rdp.ps1` on that PC to reclaim ownership.
 
 ## What remains manual
 
@@ -86,6 +110,12 @@ The PC-side SSH tunnel is not running or failed to bind port 1080. Re-run
 `.\vm-rdp.ps1` on the connecting PC or manually run
 `.\scripts\enable-proxy-point.ps1`.
 
+### Another PC took over
+
+This is expected under latest-wins ownership. The previous tunnel window exits
+after detecting that its token no longer owns the VM endpoint. Rerun
+`vm-rdp.ps1` on the desired PC to take ownership back.
+
 ### App hangs or times out after Start App Proxy
 
 Check the service, driver, and firewall rules:
@@ -120,8 +150,9 @@ This does not indicate an interactive RDP-session or ProxiFyre failure.
 
 ## Security and lifecycle notes
 
-- The SSH tunnel persists until its minimized PC-side PowerShell process is
-  stopped, the PC restarts, or `disable-proxy-point.ps1` is run.
+- The SSH tunnel normally lasts for the local RDP window lifetime. It also
+  stops when another PC claims ownership, the PC restarts, or
+  `disable-proxy-point.ps1` is run.
 - Each connecting PC receives its own SSH key, appended to the VM's
   administrators authorized-keys file.
 - `ProxiFyreService` is intentionally manual and stopped by default.

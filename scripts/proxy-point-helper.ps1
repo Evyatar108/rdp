@@ -6,6 +6,299 @@ function Get-ProxyPointKeyPath {
     return ($Config.proxyPoint.sshKeyPath -replace '^~', $env:USERPROFILE)
 }
 
+function Get-ProxyPointLocalStatePath {
+    $stateDirectory = Join-Path $env:LOCALAPPDATA "RdpProxyPoint"
+    return (Join-Path $stateDirectory "owner.json")
+}
+
+function Set-ProxyPointLocalState {
+    param(
+        [string]$OwnerToken,
+        [string]$PublicIP
+    )
+
+    $statePath = Get-ProxyPointLocalStatePath
+    $stateDirectory = Split-Path -Parent $statePath
+    New-Item -ItemType Directory -Path $stateDirectory -Force | Out-Null
+    [ordered]@{
+        ownerToken = $OwnerToken
+        publicIP = $PublicIP
+        computerName = $env:COMPUTERNAME
+        processId = $PID
+        updatedAt = (Get-Date).ToUniversalTime().ToString("o")
+    } | ConvertTo-Json | Set-Content -Path $statePath -Encoding ASCII
+}
+
+function Get-ProxyPointLocalState {
+    $statePath = Get-ProxyPointLocalStatePath
+    if (-not (Test-Path $statePath)) { return $null }
+    try {
+        return (Get-Content $statePath -Raw | ConvertFrom-Json)
+    }
+    catch {
+        return $null
+    }
+}
+
+function Clear-ProxyPointLocalState {
+    param([string]$OwnerToken)
+
+    $statePath = Get-ProxyPointLocalStatePath
+    if (-not (Test-Path $statePath)) { return }
+    $state = Get-ProxyPointLocalState
+    if (-not $OwnerToken -or ($state -and $state.ownerToken -eq $OwnerToken)) {
+        Remove-Item $statePath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Invoke-ProxyPointRemoteScript {
+    param(
+        $Config,
+        [string]$PublicIP,
+        [string]$Script,
+        [int]$ConnectTimeoutSeconds = 10
+    )
+
+    $keyPath = Get-ProxyPointKeyPath -Config $Config
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($Script))
+    $sshArgs = @(
+        "-i", $keyPath
+        "-o", "BatchMode=yes"
+        "-o", "ConnectTimeout=$ConnectTimeoutSeconds"
+        "-o", "StrictHostKeyChecking=accept-new"
+        "$($Config.proxyPoint.sshUser)@$PublicIP"
+        "powershell.exe -NoProfile -NonInteractive -EncodedCommand $encoded"
+    )
+
+    $output = & ssh @sshArgs 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Proxy Point remote command failed (ssh exit $LASTEXITCODE): $($output -join ' ')"
+    }
+    return ($output -join "`n")
+}
+
+function Claim-ProxyPointOwnership {
+    param(
+        $Config,
+        [string]$PublicIP,
+        [string]$OwnerToken
+    )
+
+    $port = [int]$Config.proxyPoint.socksPort
+    $token = $OwnerToken.Replace("'", "''")
+    $computerName = $env:COMPUTERNAME.Replace("'", "''")
+    $userName = $env:USERNAME.Replace("'", "''")
+    $remoteScript = @"
+`$ErrorActionPreference = 'Stop'
+`$stateDirectory = 'C:\ProgramData\RdpProxyPoint'
+`$statePath = Join-Path `$stateDirectory 'owner.json'
+`$lockPath = Join-Path `$stateDirectory 'ownership.lock'
+New-Item -ItemType Directory -Path `$stateDirectory -Force | Out-Null
+`$lockStream = `$null
+for (`$i = 0; `$i -lt 120 -and -not `$lockStream; `$i++) {
+    try {
+        `$lockStream = [IO.File]::Open(`$lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    } catch [IO.IOException] {
+        Start-Sleep -Milliseconds 250
+    }
+}
+if (-not `$lockStream) { throw 'Timed out waiting for the Proxy Point ownership lock.' }
+try {
+    [ordered]@{
+        ownerToken = '$token'
+        computerName = '$computerName'
+        userName = '$userName'
+        claimedAt = (Get-Date).ToUniversalTime().ToString('o')
+    } | ConvertTo-Json | Set-Content -Path `$statePath -Encoding ASCII
+
+    for (`$i = 0; `$i -lt 20; `$i++) {
+        `$listenerPids = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty OwningProcess -Unique
+        if (-not `$listenerPids) { break }
+        foreach (`$listenerPid in `$listenerPids) {
+            Stop-Process -Id `$listenerPid -Force -ErrorAction SilentlyContinue
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) {
+        try {
+            `$state = Get-Content `$statePath -Raw | ConvertFrom-Json
+            if (`$state.ownerToken -eq '$token') {
+                Remove-Item `$statePath -Force -ErrorAction SilentlyContinue
+            }
+        } catch {}
+        throw 'Could not stop the previous Proxy Point listener on port $port.'
+    }
+    Write-Output 'proxy-claimed:$token'
+}
+finally {
+    `$lockStream.Dispose()
+}
+"@
+
+    $result = Invoke-ProxyPointRemoteScript -Config $Config -PublicIP $PublicIP -Script $remoteScript
+    if ($result -notmatch "proxy-claimed:$([regex]::Escape($OwnerToken))") {
+        throw "VM did not confirm Proxy Point ownership: $result"
+    }
+}
+
+function Get-ProxyPointRemoteStatus {
+    param(
+        $Config,
+        [string]$PublicIP,
+        [string]$OwnerToken
+    )
+
+    $port = [int]$Config.proxyPoint.socksPort
+    $token = $OwnerToken.Replace("'", "''")
+    $remoteScript = @"
+`$stateDirectory = 'C:\ProgramData\RdpProxyPoint'
+`$statePath = 'C:\ProgramData\RdpProxyPoint\owner.json'
+`$lockPath = Join-Path `$stateDirectory 'ownership.lock'
+New-Item -ItemType Directory -Path `$stateDirectory -Force | Out-Null
+`$lockStream = `$null
+for (`$i = 0; `$i -lt 40 -and -not `$lockStream; `$i++) {
+    try {
+        `$lockStream = [IO.File]::Open(`$lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    } catch [IO.IOException] {
+        Start-Sleep -Milliseconds 250
+    }
+}
+if (-not `$lockStream) { throw 'Timed out waiting for the Proxy Point ownership lock.' }
+try {
+    `$ownerMatches = `$false
+    if (Test-Path `$statePath) {
+        try {
+            `$state = Get-Content `$statePath -Raw | ConvertFrom-Json
+            `$ownerMatches = (`$state.ownerToken -eq '$token')
+        } catch {}
+    }
+    `$listening = [bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
+    Write-Output ('proxy-status:{0}:{1}' -f `$ownerMatches.ToString().ToLowerInvariant(), `$listening.ToString().ToLowerInvariant())
+}
+finally {
+    `$lockStream.Dispose()
+}
+"@
+
+    $result = Invoke-ProxyPointRemoteScript -Config $Config -PublicIP $PublicIP -Script $remoteScript
+    if ($result -match 'proxy-status:(true|false):(true|false)') {
+        return [pscustomobject]@{
+            OwnerMatches = ($Matches[1] -eq "true")
+            Listening = ($Matches[2] -eq "true")
+        }
+    }
+    throw "Could not parse Proxy Point status: $result"
+}
+
+function Test-ProxyPointOwnership {
+    param(
+        $Config,
+        [string]$PublicIP,
+        [string]$OwnerToken
+    )
+
+    try {
+        return (Get-ProxyPointRemoteStatus -Config $Config -PublicIP $PublicIP -OwnerToken $OwnerToken).OwnerMatches
+    }
+    catch {
+        return $false
+    }
+}
+
+function Wait-ProxyPointReady {
+    param(
+        $Config,
+        [string]$PublicIP,
+        [string]$OwnerToken,
+        [int]$TimeoutSeconds = 20
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $consecutiveReadyChecks = 0
+    $observedOwnership = $false
+    do {
+        try {
+            $status = Get-ProxyPointRemoteStatus -Config $Config -PublicIP $PublicIP -OwnerToken $OwnerToken
+            if ($status.OwnerMatches) {
+                $observedOwnership = $true
+            }
+            elseif ($observedOwnership) {
+                throw "Proxy Point ownership was taken by another PC."
+            }
+
+            if ($status.OwnerMatches -and $status.Listening) {
+                $consecutiveReadyChecks++
+                if ($consecutiveReadyChecks -ge 3) { return }
+            }
+            else {
+                $consecutiveReadyChecks = 0
+            }
+        }
+        catch {
+            if ($_.Exception.Message -match "taken by another PC") { throw }
+            $consecutiveReadyChecks = 0
+        }
+        Start-Sleep -Seconds 1
+    } while ((Get-Date) -lt $deadline)
+
+    throw "Proxy Point did not become ready on VM localhost:$($Config.proxyPoint.socksPort) within $TimeoutSeconds seconds."
+}
+
+function Release-ProxyPointOwnership {
+    param(
+        $Config,
+        [string]$PublicIP,
+        [string]$OwnerToken
+    )
+
+    $port = [int]$Config.proxyPoint.socksPort
+    $token = $OwnerToken.Replace("'", "''")
+    $remoteScript = @"
+`$stateDirectory = 'C:\ProgramData\RdpProxyPoint'
+`$statePath = 'C:\ProgramData\RdpProxyPoint\owner.json'
+`$lockPath = Join-Path `$stateDirectory 'ownership.lock'
+New-Item -ItemType Directory -Path `$stateDirectory -Force | Out-Null
+`$lockStream = `$null
+for (`$i = 0; `$i -lt 120 -and -not `$lockStream; `$i++) {
+    try {
+        `$lockStream = [IO.File]::Open(`$lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    } catch [IO.IOException] {
+        Start-Sleep -Milliseconds 250
+    }
+}
+if (-not `$lockStream) { throw 'Timed out waiting for the Proxy Point ownership lock.' }
+try {
+    if (-not (Test-Path `$statePath)) {
+        Write-Output 'proxy-release:no-owner'
+        exit 0
+    }
+    try {
+        `$state = Get-Content `$statePath -Raw | ConvertFrom-Json
+    } catch {
+        Write-Output 'proxy-release:invalid-state'
+        exit 0
+    }
+    if (`$state.ownerToken -ne '$token') {
+        Write-Output 'proxy-release:not-owner'
+        exit 0
+    }
+    Remove-Item `$statePath -Force -ErrorAction SilentlyContinue
+    `$listenerPids = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique
+    foreach (`$listenerPid in `$listenerPids) {
+        Stop-Process -Id `$listenerPid -Force -ErrorAction SilentlyContinue
+    }
+    Write-Output 'proxy-release:released'
+}
+finally {
+    `$lockStream.Dispose()
+}
+"@
+
+    return (Invoke-ProxyPointRemoteScript -Config $Config -PublicIP $PublicIP -Script $remoteScript)
+}
+
 # Ensure this PC has an SSH keypair and its public key is authorized on the VM.
 # Requires Azure CLI to already be authenticated (uses az vm run-command).
 function Ensure-ProxyPointKey {

@@ -93,6 +93,12 @@ The **PC** (not the VM) runs `ssh -R 1080 user@vm-ip`, making the VM's
 route any app's traffic; something has to be configured to actually use
 `localhost:1080`.
 
+Multi-PC behavior is **latest connection wins**. Each RDP launch gets a random
+ownership token stored on the VM. VM-side claim/release operations are locked,
+old tunnel wrappers stop when their token loses ownership, and RDP-close
+cleanup can release only its own token. Closing the newest session does not
+restore an older still-open session automatically; rerun `vm-rdp.ps1` there.
+
 ## ProxiFyre (transparent per-app/per-folder proxying)
 
 Installed via `scripts/deploy-proxifyre.ps1`; toggled via

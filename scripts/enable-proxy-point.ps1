@@ -10,7 +10,8 @@
 #          which has already authenticated and ensured the key).
 
 param(
-    [switch]$NoAuth
+    [switch]$NoAuth,
+    [string]$OwnerToken = ([guid]::NewGuid().ToString("N"))
 )
 
 $ErrorActionPreference = "Stop"
@@ -55,15 +56,19 @@ $publicIP = az vm show -g $RG_B -n $VM_NAME -d --query "publicIps" -o tsv
 if (-not $publicIP) { Write-Error "No public IP found for VM." }
 
 Write-Host " VM: $publicIP | SOCKS on VM: localhost:$SOCKS_PORT | Exit: this PC" -ForegroundColor Cyan
+Write-Host " Ownership: latest connection wins ($env:COMPUTERNAME)" -ForegroundColor Cyan
 Write-Host " Press Ctrl+C to stop the proxy point." -ForegroundColor Yellow
 Write-Host ""
+
+Claim-ProxyPointOwnership -Config $config -PublicIP $publicIP -OwnerToken $OwnerToken
+Set-ProxyPointLocalState -OwnerToken $OwnerToken -PublicIP $publicIP
 
 # Reverse dynamic SOCKS: the VM listens on localhost:$SOCKS_PORT, this PC does
 # the SOCKS proxying, so all proxied traffic egresses from this PC's network.
 $sshArgs = @(
     "-N"
     "-R", "$SOCKS_PORT"
-    "-i", $SSH_KEY
+    "-i", "`"$SSH_KEY`""
     "-o", "BatchMode=yes"
     "-o", "ExitOnForwardFailure=yes"
     "-o", "ServerAliveInterval=15"
@@ -72,19 +77,74 @@ $sshArgs = @(
     "$SSH_USER@$publicIP"
 )
 
-while ($true) {
-    Write-Host "$(Get-Date -Format 'HH:mm:ss') Establishing tunnel..." -ForegroundColor Cyan
-    & ssh @sshArgs
-    $code = $LASTEXITCODE
-    Write-Host "$(Get-Date -Format 'HH:mm:ss') Tunnel ended (exit $code)." -ForegroundColor Yellow
-    if (-not $AUTO_RECONNECT) { break }
-    Write-Host " Reconnecting in $RECONNECT_DELAY seconds... (Ctrl+C to stop)" -ForegroundColor Gray
-    Start-Sleep -Seconds $RECONNECT_DELAY
-    # Re-resolve IP in case the VM was restarted meanwhile
-    $newIP = az vm show -g $RG_B -n $VM_NAME -d --query "publicIps" -o tsv
-    if ($newIP -and $newIP -ne $publicIP) {
-        $publicIP = $newIP
-        $sshArgs[-1] = "$SSH_USER@$publicIP"
-        Write-Host " VM IP changed - now using $publicIP" -ForegroundColor Yellow
+try {
+    while ($true) {
+        Write-Host "$(Get-Date -Format 'HH:mm:ss') Establishing tunnel..." -ForegroundColor Cyan
+        $sshProcess = Start-Process "ssh.exe" -ArgumentList $sshArgs -NoNewWindow -PassThru
+        $ownershipLost = $false
+        while (-not $sshProcess.HasExited) {
+            Start-Sleep -Seconds 1
+            try {
+                $status = Get-ProxyPointRemoteStatus `
+                    -Config $config `
+                    -PublicIP $publicIP `
+                    -OwnerToken $OwnerToken
+                if (-not $status.OwnerMatches) {
+                    $ownershipLost = $true
+                    Stop-Process -Id $sshProcess.Id -Force -ErrorAction SilentlyContinue
+                    break
+                }
+            }
+            catch {
+                # Indeterminate status (for example, a transient network loss)
+                # is not proof that another PC took ownership.
+            }
+        }
+        $sshProcess.WaitForExit()
+        $code = $sshProcess.ExitCode
+        Write-Host "$(Get-Date -Format 'HH:mm:ss') Tunnel ended (exit $code)." -ForegroundColor Yellow
+
+        if ($ownershipLost) {
+            Write-Host " A newer PC took ownership; this reconnect loop will exit." -ForegroundColor Yellow
+            break
+        }
+
+        try {
+            $status = Get-ProxyPointRemoteStatus `
+                -Config $config `
+                -PublicIP $publicIP `
+                -OwnerToken $OwnerToken
+            if (-not $status.OwnerMatches) {
+                Write-Host " A newer PC took ownership; this reconnect loop will exit." -ForegroundColor Yellow
+                break
+            }
+        }
+        catch {
+            Write-Host " Ownership status is temporarily unavailable; reconnect will retry." -ForegroundColor Gray
+        }
+
+        if (-not $AUTO_RECONNECT) { break }
+
+        Write-Host " Reconnecting in $RECONNECT_DELAY seconds... (Ctrl+C to stop)" -ForegroundColor Gray
+        Start-Sleep -Seconds $RECONNECT_DELAY
+        $newIP = az vm show -g $RG_B -n $VM_NAME -d --query "publicIps" -o tsv
+        if ($newIP -and $newIP -ne $publicIP) {
+            $publicIP = $newIP
+            $sshArgs[-1] = "$SSH_USER@$publicIP"
+            Set-ProxyPointLocalState -OwnerToken $OwnerToken -PublicIP $publicIP
+            Write-Host " VM IP changed - now using $publicIP" -ForegroundColor Yellow
+        }
     }
+}
+finally {
+    try {
+        $releaseResult = Release-ProxyPointOwnership -Config $config -PublicIP $publicIP -OwnerToken $OwnerToken
+        if ($releaseResult -match "proxy-release:released") {
+            Write-Host " Proxy Point ownership released." -ForegroundColor Green
+        }
+    }
+    catch {
+        Write-Host " Could not release Proxy Point ownership: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+    Clear-ProxyPointLocalState -OwnerToken $OwnerToken
 }

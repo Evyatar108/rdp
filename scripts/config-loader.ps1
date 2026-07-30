@@ -79,6 +79,39 @@ function Get-VMRdpConfig {
         if (-not $config.autoUpdate.enabled) {
             $config.autoUpdate | Add-Member -Type NoteProperty -Name "enabled" -Value $true
         }
+
+        # Proxy Point was added after the original config format. Keep older
+        # clones compatible while preserving explicit false values.
+        if (-not $config.proxyPoint) {
+            $config | Add-Member -Type NoteProperty -Name "proxyPoint" -Value ([pscustomobject]@{
+                enabled = $false
+                autoSetupKey = $true
+                socksPort = 1080
+                sshUser = "shabi108"
+                sshKeyPath = "~/.ssh/vm-proxy_ed25519"
+                autoReconnect = $true
+                reconnectDelaySeconds = 5
+                ownershipMode = "latestWins"
+                releaseOnRdpClose = $true
+            })
+        }
+        else {
+            $proxyPointDefaults = [ordered]@{
+                autoSetupKey = $true
+                socksPort = 1080
+                sshUser = "shabi108"
+                sshKeyPath = "~/.ssh/vm-proxy_ed25519"
+                autoReconnect = $true
+                reconnectDelaySeconds = 5
+                ownershipMode = "latestWins"
+                releaseOnRdpClose = $true
+            }
+            foreach ($field in $proxyPointDefaults.Keys) {
+                if (-not (Get-Member -InputObject $config.proxyPoint -Name $field -MemberType Properties)) {
+                    $config.proxyPoint | Add-Member -Type NoteProperty -Name $field -Value $proxyPointDefaults[$field]
+                }
+            }
+        }
         
         if (-not $config.rdp) {
             $config | Add-Member -Type NoteProperty -Name "rdp" -Value @{}

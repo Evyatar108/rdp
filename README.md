@@ -34,6 +34,7 @@ This launcher script will:
 │   ├── 📄 proxy-point-helper.ps1    ← SSH key mgmt + tunnel-running detection
 │   ├── 📄 enable-proxy-point.ps1    ← PC-side: starts the reverse SSH SOCKS tunnel
 │   ├── 📄 disable-proxy-point.ps1   ← PC-side: stops the tunnel
+│   ├── 📄 proxy-point-rdp-monitor.ps1 ← PC-side: releases ownership when RDP closes
 │   ├── 📄 vm-browser-via-proxy.ps1  ← VM-side: dedicated proxied browser profile
 │   ├── 📄 deploy-proxifyre.ps1      ← VM-side: one-time ProxiFyre install (Rivhit/Chrome/Edge)
 │   ├── 📄 deploy-vm-shortcuts.ps1   ← VM-side: recreates all proxy desktop shortcuts
@@ -168,7 +169,15 @@ proxy (with proxy-side DNS); everything else on the VM (including RDP) is unaffe
 1. Generates an SSH key on this PC on first use (`proxyPoint.autoSetupKey`)
 2. Authorizes the key on the VM automatically (one-time, via Azure run-command —
    works for any PC whose user can run the start script)
-3. Starts the tunnel in a minimized window alongside the RDP session
+3. Claims Proxy Point ownership for this PC (**latest connection wins**)
+4. Replaces any older PC's tunnel and starts this PC's tunnel minimized
+5. Releases this PC's ownership automatically when its RDP window closes
+
+If another PC runs `vm-rdp.ps1` while this session is open, that newer PC takes
+over Proxy Point automatically. The older RDP session remains connected, but
+its proxy tunnel exits and it cannot tear down the newer tunnel later. When the
+newer RDP session closes, Proxy Point becomes unavailable; an older still-open
+session is not automatically restored and must rerun `vm-rdp.ps1` to reclaim it.
 
 Then, **on the VM:** double-click the **"Browser via Proxy Point"** desktop
 shortcut (or run `.\scripts\vm-browser-via-proxy.ps1`). It opens a browser tab
@@ -192,7 +201,9 @@ stop auto-starting it with RDP.
     "sshUser": "shabi108",
     "sshKeyPath": "~/.ssh/vm-proxy_ed25519",
     "autoReconnect": true,
-    "reconnectDelaySeconds": 5
+    "reconnectDelaySeconds": 5,
+    "ownershipMode": "latestWins",
+    "releaseOnRdpClose": true
   }
 }
 ```

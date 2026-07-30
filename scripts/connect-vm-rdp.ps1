@@ -95,25 +95,54 @@ administrative session:i:1
 
 Set-Content -Path $tempRdpFile -Value $rdpContent -Force
 
-# Start proxy point tunnel (VM browser egress via this PC) if enabled
+$proxyProcess = $null
+$proxyOwnerToken = $null
+
+# Start proxy point tunnel (VM browser egress via this PC) if enabled.
+# Every connection claims a new token: latest connection wins automatically.
 if ($config.proxyPoint.enabled) {
     Write-Host " Setting up proxy point (VM browser exits via this PC)..." -ForegroundColor Yellow
     try {
+        if ($config.proxyPoint.ownershipMode -ne "latestWins") {
+            throw "Unsupported proxyPoint.ownershipMode '$($config.proxyPoint.ownershipMode)'. Expected 'latestWins'."
+        }
         . (Join-Path $PSScriptRoot "proxy-point-helper.ps1")
-        if (Test-ProxyPointRunning -Config $config) {
-            Write-Host " Proxy point tunnel already running" -ForegroundColor Green
-        }
-        else {
-            Ensure-ProxyPointKey -Config $config
-            $proxyScript = Join-Path $PSScriptRoot "enable-proxy-point.ps1"
-            Start-Process "powershell.exe" -ArgumentList @(
-                "-ExecutionPolicy", "Bypass", "-File", "`"$proxyScript`"", "-NoAuth"
-            ) -WindowStyle Minimized | Out-Null
-            Write-Host " Proxy point tunnel started (minimized window)" -ForegroundColor Green
-            Write-Host "   Use the 'Browser via Proxy Point' shortcut on the VM to browse via this PC" -ForegroundColor Gray
-        }
+        Ensure-ProxyPointKey -Config $config
+        $proxyOwnerToken = [guid]::NewGuid().ToString("N")
+        $proxyScript = Join-Path $PSScriptRoot "enable-proxy-point.ps1"
+        $proxyProcess = Start-Process "powershell.exe" -ArgumentList @(
+            "-ExecutionPolicy", "Bypass",
+            "-File", "`"$proxyScript`"",
+            "-NoAuth",
+            "-OwnerToken", $proxyOwnerToken
+        ) -WindowStyle Minimized -PassThru
+
+        Wait-ProxyPointReady `
+            -Config $config `
+            -PublicIP $publicIP `
+            -OwnerToken $proxyOwnerToken `
+            -TimeoutSeconds 20
+
+        Write-Host " Proxy point tunnel ready; this PC is the current owner" -ForegroundColor Green
+        Write-Host "   A later PC connection will take over automatically" -ForegroundColor Gray
+        Write-Host "   Use 'Start App Proxy' on the VM for Rivhit/Chrome/Edge" -ForegroundColor Gray
     }
     catch {
+        if ($proxyOwnerToken) {
+            try {
+                Release-ProxyPointOwnership `
+                    -Config $config `
+                    -PublicIP $publicIP `
+                    -OwnerToken $proxyOwnerToken | Out-Null
+            }
+            catch {}
+        }
+
+        if ($proxyProcess -and -not $proxyProcess.HasExited) {
+            if (-not $proxyProcess.WaitForExit(5000)) {
+                & taskkill.exe /PID $proxyProcess.Id /T /F 2>$null | Out-Null
+            }
+        }
         Write-Host " Proxy point setup failed: $($_.Exception.Message)" -ForegroundColor Yellow
         Write-Host "   RDP will continue; VM browser shortcut won't work until fixed" -ForegroundColor Gray
     }
@@ -126,6 +155,20 @@ $rdpProcess = Start-Process "mstsc" -ArgumentList "`"$tempRdpFile`"" -WindowStyl
 Write-Host " RDP connection launched!" -ForegroundColor Green
 Write-Host " Enter your credentials when prompted" -ForegroundColor Yellow
 Write-Host " RDP file: $tempRdpFile" -ForegroundColor Gray
+
+if ($proxyProcess -and $proxyOwnerToken -and $config.proxyPoint.releaseOnRdpClose) {
+    $proxyMonitorScript = Join-Path $PSScriptRoot "proxy-point-rdp-monitor.ps1"
+    Start-Process "powershell.exe" -ArgumentList @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "`"$proxyMonitorScript`"",
+        "-RdpProcessId", $rdpProcess.Id,
+        "-ProxyProcessId", $proxyProcess.Id,
+        "-OwnerToken", $proxyOwnerToken,
+        "-PublicIP", $publicIP
+    ) -WindowStyle Hidden | Out-Null
+    Write-Host " Proxy Point will release automatically when this RDP window closes" -ForegroundColor Gray
+}
 
 # Check if external hibernation monitoring is enabled
 if ($config.hibernation.external.enabled) {
