@@ -98,7 +98,7 @@ All settings are managed through a single JSON configuration file: **[`config.js
     "showMonitorWindow": true,
     "internal": {
       "enabled": true,
-      "inactivityTimeoutMinutes": 10,
+      "inactivityTimeoutMinutes": 60,
       "checkIntervalSeconds": 60
     }
   }

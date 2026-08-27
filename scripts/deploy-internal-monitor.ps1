@@ -29,21 +29,15 @@ function Install-InternalMonitor {
         . (Join-Path $PSScriptRoot "config-loader.ps1")
         $config = Get-VMRdpConfig
         $timeoutFromConfig = $config.hibernation.internal.inactivityTimeoutMinutes
+        $checkIntervalFromConfig = $config.hibernation.internal.checkIntervalSeconds
         Write-Host "Loaded inactivity timeout from config: $timeoutFromConfig minutes" -ForegroundColor Green
+        Write-Host "Loaded check interval from config: $checkIntervalFromConfig seconds" -ForegroundColor Green
     }
     catch {
         Write-Host "ERROR: Could not load configuration: $_" -ForegroundColor Red
         Write-Host "The internal monitor requires a valid config.json file." -ForegroundColor Red
         throw "Configuration loading failed"
     }
-
-    # Load shared Azure authentication helper
-    . (Join-Path $PSScriptRoot "azure-auth-helper.ps1")
-    
-    # Ensure Azure CLI is available and authenticated
-    Write-Host "Setting up Azure CLI..." -ForegroundColor Yellow
-    Ensure-AzureCLIInstalled
-    Ensure-AzureCLIAuthenticated -TenantId $config.azure.target.tenantId -SubscriptionId $config.azure.target.subscriptionId
 
     # Create directory structure
     if (-not (Test-Path $VMPath)) {
@@ -55,6 +49,7 @@ function Install-InternalMonitor {
     $sourceScript = Join-Path $PSScriptRoot "vm-internal-hibernation-monitor.ps1"
     $targetScript = Join-Path $VMPath "vm-internal-hibernation-monitor.ps1"
     $monitorLog = Join-Path $VMPath "hibernation-monitor.log"
+    $azureConfigPath = Join-Path $VMPath ".azure-managed-identity"
 
     if (Test-Path $sourceScript) {
         Write-Host "Copying monitor script to VM..." -ForegroundColor Green
@@ -79,7 +74,7 @@ function Install-InternalMonitor {
     }
 
     # Create task action
-    $actionArgs = "-NoProfile -NoLogo -NoExit -ExecutionPolicy Bypass -File `"$targetScript`" -InactivityTimeoutMinutes $timeoutFromConfig -LogFile `"$monitorLog`""
+    $actionArgs = "-NoProfile -NoLogo -ExecutionPolicy Bypass -File `"$targetScript`" -InactivityTimeoutMinutes $timeoutFromConfig -CheckIntervalSeconds $checkIntervalFromConfig -LogFile `"$monitorLog`" -SubscriptionId `"$($config.azure.target.subscriptionId)`" -ResourceGroup `"$($config.azure.target.resourceGroup)`" -VMName `"$($config.azure.target.vmName)`" -AzureConfigPath `"$azureConfigPath`""
     Write-Host "Task arguments: $actionArgs" -ForegroundColor Gray
     $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $actionArgs
 

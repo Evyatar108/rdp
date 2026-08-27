@@ -84,6 +84,25 @@ latter is unused and shortcuts placed there are invisible to the user).
 Always `Test-Path` first to confirm. Prefer the repo's idempotent
 `scripts/deploy-vm-shortcuts.ps1` instead of creating one-off shortcuts.
 
+## VM-side automatic hibernation
+
+`VMHibernationMonitor` is the primary hibernation mechanism;
+`hibernation.external.enabled` is deliberately `false`. It runs as `shabi108`
+in the interactive session so `GetLastInputInfo` measures that user's input.
+
+The monitor must use DesktopVM's system-assigned managed identity, not a human
+Azure CLI refresh token. CLI state lives at
+`C:\VMHibernation\.azure-managed-identity`. The custom role
+`DesktopVM Self Hibernate Operator` is scoped to this VM and allows only
+`Microsoft.Compute/virtualMachines/read` and
+`Microsoft.Compute/virtualMachines/deallocate/action`.
+
+The task runs
+`C:\VMHibernation\vm-internal-hibernation-monitor.ps1` and logs to
+`C:\VMHibernation\hibernation-monitor.log`. Verify completion through
+`az vm get-instance-view`; successful hibernation includes
+`HibernationState/Hibernated`.
+
 ## Proxy Point (reverse SSH SOCKS tunnel)
 
 The **PC** (not the VM) runs `ssh -R 1080 user@vm-ip`, making the VM's

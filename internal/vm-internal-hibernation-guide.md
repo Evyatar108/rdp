@@ -1,26 +1,19 @@
 # VM Internal Hibernation Monitor Guide
 
-## 🎯 Overview
+## Overview
 
-The VM Internal Hibernation Monitor provides **backup hibernation** that runs **inside the VM itself**. This ensures your VM hibernates even when:
+The VM Internal Hibernation Monitor is the primary automatic hibernation
+mechanism. It runs inside the VM, so it does not depend on the local RDP
+launcher or the connecting PC remaining online.
 
-- External RDP monitoring fails
-- Network connectivity is lost
-- You forget to close RDP properly
-- The external monitoring script crashes
+The external RDP-process monitor is deliberately disabled in `config.json`.
 
-## 🛡️ Dual Hibernation Protection
+## Hibernation behavior
 
-### **Primary: External RDP Monitor**
-- Monitors RDP connection from outside the VM
-- Hibernates when you close RDP (2 minutes delay)
-- Fast response, ideal for normal usage
-
-### **Backup: Internal Inactivity Monitor**
 - Runs inside the VM as a scheduled task
-- Monitors user activity (keyboard, mouse, active sessions)
-- Hibernates after 10 minutes of complete inactivity
-- Always running, provides safety net
+- Measures keyboard and mouse inactivity with `GetLastInputInfo`
+- Hibernates after 60 minutes of inactivity
+- Uses the VM's managed identity to call Azure without a human refresh token
 
 ## 🚀 Quick Setup
 
@@ -55,7 +48,7 @@ Get-Content $env:TEMP\hibernation-monitor.log -Wait
   "hibernation": {
     "internal": {
       "enabled": true,
-      "inactivityTimeoutMinutes": 10,
+      "inactivityTimeoutMinutes": 60,
       "checkIntervalSeconds": 60
     }
   }
@@ -69,58 +62,31 @@ Get-Content $env:TEMP\hibernation-monitor.log -Wait
 
 ## 🔍 How It Works
 
-### **Activity Detection:**
-1. **Keyboard/Mouse Input** - Uses Windows API to detect last input time
-2. **Active RDP Sessions** - Checks for active remote desktop connections  
-3. **User Processes** - Monitors for running browsers, Office apps, development tools
-4. **System Activity** - Combines all indicators for smart decision making
+### **Activity detection**
 
-### **Hibernation Process:**
-1. **Detection Phase** - Continuously monitors for user activity
-2. **Validation Phase** - Confirms inactivity across multiple checks
-3. **Hibernation Phase** - Tries multiple hibernation methods for reliability
-4. **Logging** - Records all activity for debugging and monitoring
+The monitor uses the Windows `GetLastInputInfo` API in `shabi108`'s
+interactive session. It does not infer activity from running applications or
+background processes.
 
-## 📊 Activity Monitoring
+### **Hibernation process**
 
-### **Monitored Processes:**
-- **Browsers:** Chrome, Firefox, Edge
-- **Office:** Word, Excel, PowerPoint
-- **Development:** Visual Studio Code, Visual Studio
-- **System:** Notepad, Command Prompt, PowerShell
-
-### **Monitored Inputs:**
-- Keyboard activity
-- Mouse movement and clicks
-- Remote desktop sessions
-- System interactions
+1. Check idle time every 60 seconds.
+2. At the threshold, log into Azure with the VM's managed identity.
+3. Run `az vm deallocate --hibernate true` for the configured VM.
+4. Log Azure errors and retry while the VM remains idle.
 
 ## 🔧 Advanced Features
 
-### **Intelligent Detection:**
-- **Multi-factor activity checking** - Combines input timing + process monitoring
-- **False positive prevention** - Requires consistent inactivity across multiple checks
-- **Session awareness** - Considers active RDP sessions as user activity
-- **Process filtering** - Ignores system processes, focuses on user applications
-
-### **Robust Hibernation:**
-- **Primary method:** PowerShell `Stop-Computer -Hibernate`
-- **Fallback 1:** Windows `shutdown /h` command
-- **Fallback 2:** Direct Windows API call via `rundll32`
-- **Error handling:** Comprehensive logging of hibernation attempts
-
 ### **Automatic Startup:**
-- **Scheduled Task** - Starts automatically with Windows
-- **System Level** - Runs as NT AUTHORITY\SYSTEM for reliability
-- **Auto-restart** - Restarts automatically if the process crashes
-- **Delayed start** - 2-minute delay after boot to allow system initialization
+- **Scheduled task** - Starts at `shabi108` logon
+- **Interactive user** - Required for session-specific idle input
+- **Recovery trigger** - Retries every minute if the monitor exits
+- **Single instance** - Prevents duplicate monitors
 
 ## 📝 Monitoring & Logging
 
 ### **Log File Location:**
-```
-%TEMP%\hibernation-monitor.log
-```
+`C:\VMHibernation\hibernation-monitor.log`
 
 ### **Sample Log Entries:**
 ```
@@ -180,7 +146,12 @@ powercfg /hibernate on
 ### **Debug Mode:**
 ```powershell
 # Run monitor manually for debugging
-.\vm-internal-hibernation-monitor.ps1 -InactivityTimeoutMinutes 2 -CheckIntervalSeconds 10
+.\vm-internal-hibernation-monitor.ps1 `
+    -InactivityTimeoutMinutes 2 `
+    -CheckIntervalSeconds 10 `
+    -SubscriptionId "<subscription-id>" `
+    -ResourceGroup "<resource-group>" `
+    -VMName "<vm-name>"
 ```
 
 ## 💡 Best Practices
@@ -197,26 +168,16 @@ powercfg /hibernate on
 - Scheduled task has built-in restart capabilities
 - Check interval can be increased for less frequent monitoring
 
-### **Security Considerations:**
-- Runs as SYSTEM account for reliability
-- No network communication required
-- Local activity monitoring only
-- No sensitive data logged
+### **Security considerations**
 
-## 🔗 Integration with External Monitor
+- The monitor uses isolated Azure CLI state under
+  `C:\VMHibernation\.azure-managed-identity`.
+- The `DesktopVM Self Hibernate Operator` role is assigned only on DesktopVM.
+- The role permits only VM read and deallocate actions.
+- No human Azure refresh token is required or stored for the task.
 
-The internal monitor works **alongside** the external RDP monitor:
+## External monitor
 
-### **Cooperation Logic:**
-1. **External monitor** hibernates when RDP closes (2 minutes)
-2. **Internal monitor** hibernates after inactivity (10 minutes)
-3. **Whichever triggers first** will hibernate the VM
-4. **Both provide safety nets** for different scenarios
-
-### **Typical Scenarios:**
-- **Normal usage:** External monitor hibernates when you close RDP
-- **Forgotten session:** Internal monitor hibernates after inactivity timeout
-- **Network issues:** Internal monitor continues working independently
-- **Process crashes:** The other monitor provides backup
-
-This creates a **robust, fail-safe hibernation system** that maximizes cost savings while ensuring reliability! 🎉
+`hibernation.external.enabled` remains `false`. If it is intentionally enabled
+later, both monitors act independently and whichever reaches Azure first will
+hibernate the VM.

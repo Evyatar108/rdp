@@ -31,6 +31,12 @@ Set-Location C:\repos\rdp
 .\scripts\deploy-internal-monitor.ps1
 ```
 
+The VM uses its system-assigned managed identity to request its own
+hibernation. That identity needs only VM read and deallocate permissions on
+this VM. The monitor stores managed-identity Azure CLI state separately under
+`C:\VMHibernation\.azure-managed-identity`; it does not depend on a human
+Azure CLI refresh token.
+
 ### External RDP-process monitor
 
 `hibernation.external.enabled` controls the PC-side monitor launched by
@@ -76,6 +82,21 @@ above.
   }
 }
 ```
+
+## Design decision
+
+⟦def decision:vm-side-hibernation-primary⟧ Keep the VM-side inactivity
+monitor as the primary automatic hibernation mechanism.
+
+Rationale: hibernation must continue to work when RDP is opened outside this
+repository's launcher or when the connecting PC exits before the timeout.
+
+Rejected alternative: the PC-side RDP-process monitor remains disabled because
+it depends on the launcher process and the connecting PC staying available.
+
+Reversal condition: enable the external monitor only if the VM-side monitor
+cannot be made reliable or the desired trigger changes from guest inactivity
+to closing one specific local RDP window.
 
 Set only one mechanism as authoritative unless you intentionally want both.
 If both are enabled, either monitor may hibernate the VM first.

@@ -82,6 +82,29 @@ silently doesn't show up. Always verify with `Test-Path` before writing.
 Use `scripts/deploy-vm-shortcuts.ps1` instead of one-off shortcut scripts so
 the VM desktop state remains reproducible from the repo.
 
+## VM-side automatic hibernation
+
+The VM-side `VMHibernationMonitor` scheduled task is the primary automatic
+hibernation mechanism; `hibernation.external.enabled` is deliberately `false`.
+The task runs as `shabi108` in the interactive session because
+`GetLastInputInfo` is session-specific.
+
+Do not use a human Azure CLI login for unattended hibernation. Refresh tokens
+expire and leave the VM running. The monitor logs into Azure with DesktopVM's
+system-assigned managed identity using the isolated CLI state directory
+`C:\VMHibernation\.azure-managed-identity`. Its custom role,
+`DesktopVM Self Hibernate Operator`, is assigned only on this VM and permits
+only:
+
+- `Microsoft.Compute/virtualMachines/read`
+- `Microsoft.Compute/virtualMachines/deallocate/action`
+
+The deployed monitor is
+`C:\VMHibernation\vm-internal-hibernation-monitor.ps1`; its log is
+`C:\VMHibernation\hibernation-monitor.log`. Confirm a completed run with
+`az vm get-instance-view`; a real hibernation reports
+`HibernationState/Hibernated`, not only `PowerState/deallocated`.
+
 ## PowerShell `Start-Process -ArgumentList` quoting
 
 Any argument containing embedded spaces (e.g. Chrome's

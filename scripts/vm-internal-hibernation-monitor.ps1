@@ -4,12 +4,31 @@
 
 param(
     [Parameter(Mandatory = $true)]
+    [ValidateRange(1, 2147483647)]
     [int]$InactivityTimeoutMinutes,
+    [ValidateRange(1, 2147483647)]
     [int]$CheckIntervalSeconds = 60,
-    [string]$LogFile = "C:\VMHibernation\hibernation-monitor.log"
+    [string]$LogFile = "C:\VMHibernation\hibernation-monitor.log",
+    [Parameter(Mandatory = $true)]
+    [string]$SubscriptionId,
+    [Parameter(Mandatory = $true)]
+    [string]$ResourceGroup,
+    [Parameter(Mandatory = $true)]
+    [string]$VMName,
+    [string]$AzureConfigPath = "C:\VMHibernation\.azure-managed-identity"
 )
 
 $ErrorActionPreference = 'Continue'
+
+function Write-Log {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Add-Content -Path $LogFile -Value "[$timestamp] $Message" -Encoding UTF8
+}
 
 function Get-SystemIdleTimeSeconds {
     <#
@@ -48,9 +67,8 @@ public struct LASTINPUTINFO
         if ([Win32.InputTimer]::GetLastInputInfo([ref]$lastInputInfo)) {
             $currentTicks = [Win32.InputTimer]::GetTickCount64()
             $lastInputTicks = $lastInputInfo.dwTime
-            
-            # The subtraction correctly handles timer wraparound when one value is from the 64-bit counter
-            $idleMilliseconds = $currentTicks - $lastInputTicks
+
+            $idleMilliseconds = ($currentTicks - $lastInputTicks) % 4294967296
             
             return [math]::Max(0, [math]::Round($idleMilliseconds / 1000))
         }
@@ -66,37 +84,63 @@ public struct LASTINPUTINFO
     }
 }
 function Invoke-VMHibernation {
+    $previousAzureConfigPath = $env:AZURE_CONFIG_DIR
+
     try {
-        # VM details - these will be injected by the deployment script
-        $resourceGroup = "VM-RG-ISRAEL"
-        $vmName = "DesktopVM"
-        
+        New-Item -Path $AzureConfigPath -ItemType Directory -Force | Out-Null
+        $env:AZURE_CONFIG_DIR = $AzureConfigPath
+
+        $loginOutput = az login --identity --allow-no-subscriptions --output none 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "ERROR: Managed identity login failed. Output: $($loginOutput -join ' ')"
+            return $false
+        }
+
+        $accountOutput = az account set --subscription $SubscriptionId 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "ERROR: Could not select subscription $SubscriptionId. Output: $($accountOutput -join ' ')"
+            return $false
+        }
+
         Write-Host "Hibernating VM using Azure CLI..." -ForegroundColor Green
-        Write-Host "Running: az vm deallocate -g $resourceGroup -n $vmName --hibernate true" -ForegroundColor Gray
+        Write-Host "Running: az vm deallocate -g $ResourceGroup -n $VMName --hibernate true" -ForegroundColor Gray
         
-        # Use the same Azure CLI command as the external monitor
-        $hibernateOutput = az vm deallocate -g $resourceGroup -n $vmName --hibernate true 2>&1
+        $hibernateOutput = az vm deallocate -g $ResourceGroup -n $VMName --hibernate true 2>&1
         $hibernateExitCode = $LASTEXITCODE
         
         if ($hibernateExitCode -eq 0) {
             Write-Host "VM hibernated successfully!" -ForegroundColor Green
+            Write-Log "Azure accepted the hibernation request."
             return $true
         }
         else {
             Write-Host "Azure hibernation failed with exit code: $hibernateExitCode" -ForegroundColor Red
             Write-Host "Output: $hibernateOutput" -ForegroundColor Yellow
+            Write-Log "ERROR: Azure hibernation failed with exit code $hibernateExitCode. Output: $($hibernateOutput -join ' ')"
             return $false
         }
     }
     catch {
         Write-Host "Error during hibernation: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Log "ERROR during hibernation: $($_.Exception.Message)"
         return $false
+    }
+    finally {
+        if ($null -eq $previousAzureConfigPath) {
+            Remove-Item Env:\AZURE_CONFIG_DIR -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:AZURE_CONFIG_DIR = $previousAzureConfigPath
+        }
     }
 }
 # Main monitoring loop
 $inactivityThresholdSeconds = $InactivityTimeoutMinutes * 60
+$lastStatusLog = [datetime]::MinValue
 
 try {
+    Write-Log "Monitor started for $ResourceGroup/$VMName with a $InactivityTimeoutMinutes minute timeout and a $CheckIntervalSeconds second check interval."
+
     while ($true) {
         $idleSeconds = Get-SystemIdleTimeSeconds
         
@@ -111,10 +155,16 @@ try {
         }
         Write-Progress -Activity "VM Auto-Hibernation Monitor" -Status $statusMessage -PercentComplete $percentComplete
 
+        if (((Get-Date) - $lastStatusLog).TotalMinutes -ge 5) {
+            Write-Log "Idle for $idleSeconds seconds; threshold is $inactivityThresholdSeconds seconds."
+            $lastStatusLog = Get-Date
+        }
+
         if ($idleSeconds -ge $inactivityThresholdSeconds) {
             try { Write-Progress -Activity "VM Auto-Hibernation Monitor" -Completed -ErrorAction SilentlyContinue } catch {}
             Write-Host ""
             Write-Host "Idle threshold reached. Triggering hibernation..." -ForegroundColor Yellow
+            Write-Log "Idle threshold reached. Requesting hibernation."
             
             $hibernationResult = Invoke-VMHibernation
             
@@ -125,7 +175,7 @@ try {
                 
                 # Reset the idle time tracking by waiting for user activity
                 # This prevents immediate re-hibernation if the VM resumes quickly
-                $resetWaitTime = 6000  # 5 minutes buffer after hibernation
+                $resetWaitTime = 300
                 Write-Host "Waiting $($resetWaitTime/60) minutes buffer before resuming monitoring..." -ForegroundColor Gray
                 
                 for ($resetCounter = $resetWaitTime; $resetCounter -gt 0; $resetCounter -= $CheckIntervalSeconds) {
@@ -156,8 +206,12 @@ try {
         Start-Sleep -Seconds $CheckIntervalSeconds
     }
 }
+catch [System.Management.Automation.PipelineStoppedException] {
+    Write-Log "Monitor stopped."
+}
 catch {
-    # Catch Ctrl+C or other terminating errors
+    Write-Log "FATAL: Monitor stopped unexpectedly: $($_.Exception.Message)"
+    throw
 }
 finally {
     try { Write-Progress -Activity "VM Auto-Hibernation Monitor" -Completed -ErrorAction SilentlyContinue } catch {}
