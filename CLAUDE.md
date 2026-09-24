@@ -204,11 +204,13 @@ disks had drifted past the Jul 29 migration snapshots. Anything written in
 that window exists only in these two snapshots. Do not delete them without
 confirming that window is not needed.
 
-The Israel snapshots `os-snap-il` and `data0-snap-il` remain in
-`VM-RG-ISRAEL`. They are rollback copies only — the live disks were made with
-`createOption: Copy` and are fully independent, so removing the snapshots
-would not affect the running VM.
+The Israel migration snapshots `os-snap-il` and `data0-snap-il` were also
+deleted on 2026-09-24. They were rollback copies only — the live disks were
+made with `createOption: Copy` and are fully independent, so removing the
+snapshots did not affect the running VM. `VM-RG-ISRAEL` now holds just the
+live environment.
 
 Cost note: with the Germany VM deleted the standing spend there drops by
-about $11.59/month. Both VMs having run 24/7 is what produced the
-$380.46 August usage (a $230 bill after the $150 Visual Studio credit).
+about $11.59/month, plus $3.06/month from the Israel snapshots. Both VMs
+having run 24/7 is what produced the $380.46 August usage (a $230 bill after
+the $150 Visual Studio credit).

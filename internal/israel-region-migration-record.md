@@ -87,12 +87,21 @@ the Germany VM between 2026-07-30 and 2026-08-27.
 
 Delete them only after confirming nothing from that window is needed.
 
-## Israel migration snapshots
+## Israel migration snapshots (deleted 2026-09-24)
 
-`os-snap-il` and `data0-snap-il` are still present in `VM-RG-ISRAEL`.
+`os-snap-il` and `data0-snap-il` were deleted on 2026-09-24 with explicit user
+approval, after the Germany retirement above.
 
-They are not required for the Israel VM to run. The live disks were created
-from them with `createOption: Copy`, which produces a full independent copy;
-`completionPercent` is null, confirming no copy operation is outstanding.
-Deleting these snapshots does not affect the running VM. They are rollback
-copies of the Jul 29 disk state only.
+They were never required for the Israel VM to run. The live disks were created
+from them with `createOption: Copy`, which produces a full independent copy,
+and `completionPercent` was null, confirming no copy operation was
+outstanding. Their only function was reverting the Israel VM to its Jul 29
+state, which by then was nearly two months stale and would have discarded all
+work since the cutover.
+
+Deleting them did not affect the live VM: it remained `Succeeded` /
+`HibernationState/Hibernated` on `20.217.25.211` afterwards.
+
+`VM-RG-ISRAEL` now contains only the live environment: `DesktopVM`, its two
+managed disks, `vnet-DesktopVM`, `nsg-desktopvm`, `nic-desktopvm`, and
+`pip-desktopvm`.
