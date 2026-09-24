@@ -105,6 +105,44 @@ The deployed monitor is
 `az vm get-instance-view`; a real hibernation reports
 `HibernationState/Hibernated`, not only `PowerState/deallocated`.
 
+## Cost alerting
+
+`scripts/deploy-cost-alert.ps1` maintains a monthly Azure Consumption budget
+that emails when subscription spend crosses `costAlert.monthlyAmountUsd` in
+`config.json`. It registers both an **Actual** and a **Forecasted** alert; the
+forecast one fires days earlier and is the one that actually prevents a
+surprise bill.
+
+Gotchas found while building it:
+
+- **`az consumption budget create` cannot attach email notifications.** It has
+  no `--contact-email` style parameter, so the script PUTs to the Consumption
+  REST API (`Microsoft.Consumption/budgets`, api-version `2021-10-01`)
+  instead. Do not "simplify" it back to the CLI command.
+- **Inline JSON bodies get mangled by PowerShell quoting.** The script writes
+  the payload to a temp file and passes `--body "@file"`. Same class of
+  problem as the `--scripts "@file"` rule for `az vm run-command` above.
+- **Do not force a global CLI context switch for a single-subscription
+  script.** `Ensure-AzureCLIAuthenticated` runs `az login --tenant` whenever
+  the active context is a different tenant, which opens a browser and
+  repoints this machine's default subscription — disruptive when the operator
+  is working in another tenant. This script instead probes
+  `az account show --subscription <id>` first and only signs in when the
+  subscription is genuinely unreachable, passing `--subscription` explicitly
+  on every call.
+- **A new budget reports `0` spend** until Azure's first evaluation cycle
+  (up to ~24h). That is not a deployment failure.
+- Azure requires a monthly budget to start on the **first day of a month**.
+  The script preserves the existing start date on re-runs so the budget's
+  history is not reset.
+
+## Known pending items
+
+- `VM-RG-TARGET` retains `desktopvm-os-final-20260924` and
+  `desktopvm-data0-final-20260924`. These hold the only copy of anything
+  written on the Germany VM between 2026-07-30 and 2026-08-27. Confirm that
+  window is not needed before deleting them.
+
 ## PowerShell `Start-Process -ArgumentList` quoting
 
 Any argument containing embedded spaces (e.g. Chrome's

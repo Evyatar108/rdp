@@ -121,6 +121,31 @@ function Get-VMRdpConfig {
         if (-not $config.rdp.connection) {
             $config.rdp | Add-Member -Type NoteProperty -Name "connection" -Value @{}
         }
+
+        # Cost alerting was added after the original config format. Keep older
+        # clones compatible while preserving explicit false values.
+        if (-not $config.costAlert) {
+            $config | Add-Member -Type NoteProperty -Name "costAlert" -Value ([pscustomobject]@{
+                enabled = $false
+                budgetName = "desktopvm-monthly-cost-alert"
+                monthlyAmountUsd = 75
+                contactEmails = @()
+                forecastAlert = $true
+            })
+        }
+        else {
+            $costAlertDefaults = [ordered]@{
+                budgetName = "desktopvm-monthly-cost-alert"
+                monthlyAmountUsd = 75
+                contactEmails = @()
+                forecastAlert = $true
+            }
+            foreach ($field in $costAlertDefaults.Keys) {
+                if (-not (Get-Member -InputObject $config.costAlert -Name $field -MemberType Properties)) {
+                    $config.costAlert | Add-Member -Type NoteProperty -Name $field -Value $costAlertDefaults[$field]
+                }
+            }
+        }
         
         if (-not $config.logging) {
             $config | Add-Member -Type NoteProperty -Name "logging" -Value @{}

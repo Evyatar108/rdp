@@ -104,6 +104,23 @@ The task runs
 `az vm get-instance-view`; successful hibernation includes
 `HibernationState/Hibernated`.
 
+## Cost alerting
+
+`scripts/deploy-cost-alert.ps1` maintains a monthly Azure budget that emails
+when spend crosses `costAlert.monthlyAmountUsd` in `config.json`. It is
+idempotent; `-Status` reports it and `-Remove` deletes it.
+
+- `az consumption budget create` **cannot attach email notifications** — the
+  script uses the Consumption REST API instead. Don't swap it back.
+- Pass JSON bodies to `az rest` as `--body "@file"`; inline JSON is mangled by
+  PowerShell quoting.
+- The script deliberately avoids `az login --tenant`, which would repoint this
+  machine's default subscription. It probes
+  `az account show --subscription <id>` and passes `--subscription` on every
+  call.
+- A newly created budget shows `0` spend until Azure's first evaluation cycle
+  (up to ~24h). Not a failure.
+
 ## Proxy Point (reverse SSH SOCKS tunnel)
 
 The **PC** (not the VM) runs `ssh -R 1080 user@vm-ip`, making the VM's

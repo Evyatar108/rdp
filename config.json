@@ -46,6 +46,15 @@
       ]
     }
   },
+  "costAlert": {
+    "enabled": true,
+    "budgetName": "desktopvm-monthly-cost-alert",
+    "monthlyAmountUsd": 75,
+    "contactEmails": [
+      "evyatar109@gmail.com"
+    ],
+    "forecastAlert": true
+  },
   "logging": {
     "verboseOutput": true,
     "showDetailedErrors": true

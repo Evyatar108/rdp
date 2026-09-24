@@ -31,6 +31,7 @@ This launcher script will:
 │   ├── 📄 stop-vm.ps1
 │   ├── 📄 deploy-internal-monitor.ps1
 │   ├── 📄 vm-internal-hibernation-monitor.ps1
+│   ├── 📄 deploy-cost-alert.ps1     ← Azure budget + email alerts on overspend
 │   ├── 📄 proxy-point-helper.ps1    ← SSH key mgmt + tunnel-running detection
 │   ├── 📄 enable-proxy-point.ps1    ← PC-side: starts the reverse SSH SOCKS tunnel
 │   ├── 📄 disable-proxy-point.ps1   ← PC-side: stops the tunnel
@@ -298,6 +299,55 @@ the app's part at all. This is used for a single unified toggle that covers
 - **After:** Intelligent auto-hibernation = ~$10-20/month  
 - **Your Savings:** Up to **80% cost reduction**
 - **Zero manual intervention** required
+
+## 🔔 Cost Alerting
+
+A monthly Azure budget emails you when subscription spend crosses a limit, so
+a broken hibernation or a forgotten VM cannot quietly run up a bill.
+
+Deploy or update it from this repo:
+
+```powershell
+.\scripts\deploy-cost-alert.ps1            # create or update the budget
+.\scripts\deploy-cost-alert.ps1 -Status    # show amount, spend, and alerts
+.\scripts\deploy-cost-alert.ps1 -Remove    # delete the budget
+```
+
+The script is idempotent — re-running it converges on the configured state and
+preserves the budget's original start date.
+
+### Configuration (`config.json`)
+
+```json
+{
+  "costAlert": {
+    "enabled": true,
+    "budgetName": "desktopvm-monthly-cost-alert",
+    "monthlyAmountUsd": 75,
+    "contactEmails": ["you@example.com"],
+    "forecastAlert": true
+  }
+}
+```
+
+- `monthlyAmountUsd` — the threshold. Two alerts are registered against it:
+  **Actual**, which fires once spend passes the amount, and **Forecasted**,
+  which fires as soon as Azure projects the month will exceed it. The forecast
+  alert is the useful one: it warns while there is still time to act.
+- `forecastAlert` — set to `false` for the actual-spend alert only.
+- `contactEmails` — at least one address is required; Azure rejects a budget
+  alert with no recipients. This does not have to be your Azure sign-in
+  address.
+- `enabled` — set to `false` to skip deployment. Use `-Remove` to delete a
+  budget that already exists.
+
+The budget tracks **usage**, not what you are charged. On a Visual Studio
+subscription with a monthly credit, crossing the threshold is a warning that
+you are burning through the credit, not necessarily a bill.
+
+A newly created budget reports `0` spend until Azure runs its first evaluation
+cycle, which can take up to a day. That is expected and not a deployment
+failure.
 
 ## 🔧 Advanced Features
 
