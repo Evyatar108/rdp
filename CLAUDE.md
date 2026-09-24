@@ -15,8 +15,8 @@ hard way.
 
 - **VM:** `DesktopVM`, resource group `VM-RG-ISRAEL`, region **Israel Central**
   (moved here from `germanywestcentral`/`VM-RG-TARGET` via cross-region
-  snapshot copy — the old Germany RG/snapshots may still exist pending
-  cleanup, see "Known pending cleanup" below).
+  snapshot copy — that Germany environment was deleted on 2026-09-24; only
+  safety snapshots remain, see "Germany environment" below).
 - **Subscription/tenant:** see `config.json` → `azure.target` (do not hardcode
   elsewhere; always read from config).
 - **VM login user:** `shabi108` (local admin on the VM).
@@ -177,8 +177,8 @@ without needing browser-specific proxy flags. Non-obvious pitfalls:
   made before the driver attached will not retroactively be proxied.
 
 User-facing operating/recovery instructions live in
-`internal/proxy-point-operations.md`. The completed regional cutover and
-pending cleanup inventory are recorded in
+`internal/proxy-point-operations.md`. The completed regional cutover and the
+2026-09-24 Germany deletion are recorded in
 `internal/israel-region-migration-record.md`.
 
 The `internal` folder also contains historical migration artifacts. Read
@@ -186,10 +186,29 @@ The `internal` folder also contains historical migration artifacts. Read
 `internal/copy-vm.ps1` is the retired cross-tenant/Germany flow and must not
 be used for the current VM.
 
-## Known pending cleanup (not yet actioned — needs explicit user go-ahead)
+## Germany environment: deleted 2026-09-24
 
-- Old Germany resource group `VM-RG-TARGET` (VM already deallocated) and its
-  snapshots, plus the intermediate copy snapshots used during the region
-  move (`os-snap-move-il`, `data0-snap-move-il`, `os-snap-il`,
-  `data0-snap-il`). Left in place intentionally until the Israel VM has been
-  used long enough to be confident nothing needs to fall back.
+The old `VM-RG-TARGET` environment is gone. The VM, its disks, its networking,
+and the leftover unmanaged-VHD storage account were deleted on 2026-09-24
+with explicit user approval.
+
+The resource group still exists and holds only two full, independent
+safety snapshots of the Germany disks as they stood at deletion:
+
+- `desktopvm-os-final-20260924`
+- `desktopvm-data0-final-20260924`
+
+These matter because the Germany VM did not stay deallocated after the
+cutover. It was restarted on 2026-07-30 and ran until 2026-08-27, so its
+disks had drifted past the Jul 29 migration snapshots. Anything written in
+that window exists only in these two snapshots. Do not delete them without
+confirming that window is not needed.
+
+The Israel snapshots `os-snap-il` and `data0-snap-il` remain in
+`VM-RG-ISRAEL`. They are rollback copies only — the live disks were made with
+`createOption: Copy` and are fully independent, so removing the snapshots
+would not affect the running VM.
+
+Cost note: with the Germany VM deleted the standing spend there drops by
+about $11.59/month. Both VMs having run 24/7 is what produced the
+$380.46 August usage (a $230 bill after the $150 Visual Studio credit).

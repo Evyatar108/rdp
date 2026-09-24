@@ -45,25 +45,54 @@ High-level sequence:
 - `.github/skills/azure-vm-rdp-ops/SKILL.md` contains the reusable Copilot CLI
   operational skill.
 
-## Rollback and pending cleanup
+## Germany retirement (completed 2026-09-24)
 
-The old Germany VM was left deallocated rather than immediately deleted.
-Cleanup still requires explicit user approval.
+The Germany environment was deleted on 2026-09-24 with explicit user approval.
 
-Known cleanup candidates:
+### Why it needed a safety copy first
 
-- resource group `VM-RG-TARGET`
-- Germany snapshots `os-snap-move-il`, `data0-snap-move-il`
-- Israel copy snapshots `os-snap-il`, `data0-snap-il`
+The Germany VM did not stay deallocated after the cutover. The Azure activity
+log shows it was started again on 2026-07-30 10:22 UTC — the day after the
+migration snapshots were taken — and it then ran continuously until
+2026-08-27 14:37 UTC. During that window the launcher was failing on at least
+one PC, and the RDP file downloaded from the Azure portal pointed at the
+Germany VM, so real work may have been done there.
 
-Before deleting anything:
+That means the Jul 29 migration snapshots no longer represented the Germany
+disks' final state. Before deleting, the disks were captured as they stood.
 
-1. Confirm the Israel VM boots and RDP works.
-2. Confirm the Rivhit application/data and attached data disk are intact.
-3. Confirm hibernation/resume works.
-4. Confirm no DNS, scripts, credentials, or integrations still reference the
-   old Germany public IP or resource IDs.
-5. Inventory the candidate resources with Azure CLI and obtain explicit user
-   confirmation for the exact deletion list.
+### Deleted
 
-Do not treat this document as deletion authorization.
+- VM `DesktopVM` (germanywestcentral)
+- disks `DesktopVM-OS-Managed` (127 GB), `DesktopVM-Data0-Managed` (32 GB)
+- network `vnet-DesktopVM`, `nic-desktopvm`, `pip-desktopvm`
+- storage account `vhdstgt830292774`, holding the orphaned original unmanaged
+  VHDs `osdisk.vhd` and `datadisk0.vhd` (159 GB provisioned, untouched since
+  2025-08-17, no lease)
+- stale Jul 29 snapshots `os-snap-move-il`, `data0-snap-move-il`, which only
+  duplicated what had already been copied to Israel
+
+### Retained
+
+Resource group `VM-RG-TARGET` still exists and holds only the final-state
+safety snapshots:
+
+- `desktopvm-os-final-20260924` (127 GB)
+- `desktopvm-data0-final-20260924` (32 GB)
+
+Both are full (non-incremental) `Standard_LRS` snapshots, so they are
+independent of the now-deleted source disks and can be restored to managed
+disks on their own. They are the only remaining route to anything written on
+the Germany VM between 2026-07-30 and 2026-08-27.
+
+Delete them only after confirming nothing from that window is needed.
+
+## Israel migration snapshots
+
+`os-snap-il` and `data0-snap-il` are still present in `VM-RG-ISRAEL`.
+
+They are not required for the Israel VM to run. The live disks were created
+from them with `createOption: Copy`, which produces a full independent copy;
+`completionPercent` is null, confirming no copy operation is outstanding.
+Deleting these snapshots does not affect the running VM. They are rollback
+copies of the Jul 29 disk state only.

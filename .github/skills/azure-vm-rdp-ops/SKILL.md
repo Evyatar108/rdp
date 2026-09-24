@@ -22,9 +22,10 @@ sync with `CLAUDE.md` when things change.
 ## Known-good environment
 
 - **VM:** `DesktopVM`, resource group `VM-RG-ISRAEL`, region **Israel
-  Central** (moved here from `germanywestcentral`/`VM-RG-TARGET`; the old
-  Germany RG/snapshots may still exist pending cleanup — check before
-  assuming they're gone).
+  Central** (moved here from `germanywestcentral`/`VM-RG-TARGET`; that
+  Germany environment was deleted on 2026-09-24 — `VM-RG-TARGET` now holds
+  only the `*-final-20260924` safety snapshots, so treat any reference to a
+  live Germany VM or its old public IP as stale).
 - **VM login user:** `shabi108` (local admin).
 - **VM repo clone:** `C:\repos\rdp`.
 - **Subscription/tenant/RG/VM name:** always read from `config.json` →

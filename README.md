@@ -343,7 +343,7 @@ the app's part at all. This is used for a single unified toggle that covers
 - **[`internal/hibernation-quick-reference.md`](internal/hibernation-quick-reference.md)** - Quick commands
 - **[`internal/fix-pagefile-hibernation.md`](internal/fix-pagefile-hibernation.md)** - Troubleshooting
 - **[`internal/proxy-point-operations.md`](internal/proxy-point-operations.md)** - Proxy Point/App Proxy behavior, verification, recovery, and troubleshooting
-- **[`internal/israel-region-migration-record.md`](internal/israel-region-migration-record.md)** - Durable record of the Germany-to-Israel migration and pending cleanup
+- **[`internal/israel-region-migration-record.md`](internal/israel-region-migration-record.md)** - Durable record of the Germany-to-Israel migration and the Germany retirement
 
 ---
 

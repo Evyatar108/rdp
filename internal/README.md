@@ -16,7 +16,7 @@ instructions to the current Israel Central VM.
 - `proxy-point-operations.md` - Proxy Point and ProxiFyre usage,
   verification, rebuild, and troubleshooting.
 - `israel-region-migration-record.md` - completed Germany-to-Israel cutover
-  record and pending cleanup inventory.
+  record and the 2026-09-24 Germany retirement.
 - `disable-rdp-manual-steps.md` - RDP policy/manual configuration notes.
 
 ## Current setup scripts
